@@ -5,9 +5,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -23,22 +23,33 @@ import com.example.modernweather.ui.viewmodel.WeatherViewModel
 @Composable
 fun LocationsScreen(
     viewModel: WeatherViewModel,
-    onLocationClick: (String) -> Unit
+    onLocationClick: (String) -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     val uiState by viewModel.locationsState.collectAsState()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Lokalizacje") },
+                title = { Text("Moje Lokalizacje") },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
+                    containerColor = MaterialTheme.colorScheme.background,
+                    titleContentColor = MaterialTheme.colorScheme.onBackground
+                ),
+                actions = {
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = "Ustawienia"
+                        )
+                    }
+                }
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
-        Column(modifier = Modifier.padding(paddingValues)) {
-            SearchBar()
+        Column(modifier = Modifier.padding(paddingValues).padding(horizontal = 16.dp)) {
+            SearchBar() // Teraz ta funkcja będzie zdefiniowana poniżej
             when {
                 uiState.isLoading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -53,7 +64,7 @@ fun LocationsScreen(
                 else -> {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                        contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
                         item {
                             Text(
@@ -75,6 +86,7 @@ fun LocationsScreen(
 
 @Composable
 private fun SearchBar() {
+    // Prosta, nieaktywna implementacja paska wyszukiwania
     OutlinedTextField(
         value = "",
         onValueChange = {},
@@ -83,7 +95,7 @@ private fun SearchBar() {
         leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Szukaj") },
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(vertical = 8.dp),
         shape = MaterialTheme.shapes.extraLarge
     )
 }
@@ -116,5 +128,3 @@ private fun LocationItem(location: Location, onClick: () -> Unit) {
         }
     }
 }
-
-

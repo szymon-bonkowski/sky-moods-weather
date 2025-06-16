@@ -1,12 +1,13 @@
 package com.example.modernweather.data.models
 
-import androidx.compose.ui.graphics.vector.ImageVector
 import java.time.LocalDate
 import java.time.LocalTime
+
 
 enum class WeatherCondition {
     SUNNY, PARTLY_CLOUDY, CLOUDY, RAIN, HEAVY_RAIN, THUNDERSTORM, SNOW, FOG
 }
+
 
 enum class AlertSeverity {
     INFO, WARNING, SEVERE
@@ -51,17 +52,21 @@ data class WeatherAlert(
 )
 
 data class WeatherDetails(
-    val windSpeed: String,
+    val windSpeed: Int, // km/h
+    val windGusts: Int, // km/h
     val windDirection: String,
-    val humidity: Int,
-    val dewPoint: Int,
-    val pressure: Int,
+    val humidity: Int, // w %
+    val dewPoint: Int, // w °C
+    val pressure: Int, // w hPa
+    val pressureTrend: String, // "Rising", "Falling", "Steady"
     val uvIndex: Int,
     val visibility: String,
-    val cloudCover: Int
+    val cloudCover: Int, // w %
+    val airQualityIndex: Int
 )
 
 data class SunInfo(
     val sunrise: LocalTime,
     val sunset: LocalTime
 )
+

@@ -1,14 +1,17 @@
 package com.example.modernweather.ui.viewmodel
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.modernweather.data.models.Location
+import com.example.modernweather.data.models.TemperatureUnit
+import com.example.modernweather.data.models.UserSettings
 import com.example.modernweather.data.models.WeatherData
 import com.example.modernweather.data.repository.FakeWeatherRepository
+import com.example.modernweather.data.repository.SettingsRepository
 import com.example.modernweather.data.repository.WeatherRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class LocationsUiState(
@@ -23,15 +26,32 @@ sealed interface WeatherDetailUiState {
     data class Error(val message: String) : WeatherDetailUiState
 }
 
-class WeatherViewModel(
+data class SettingsUiState(
+    val userSettings: UserSettings = UserSettings(temperatureUnit = TemperatureUnit.CELSIUS)
+)
+
+class WeatherViewModel(application: Application) : AndroidViewModel(application) {
+
     private val weatherRepository: WeatherRepository = FakeWeatherRepository()
-) : ViewModel() {
+    private val settingsRepository: SettingsRepository = SettingsRepository(application)
 
     private val _locationsState = MutableStateFlow(LocationsUiState())
     val locationsState = _locationsState.asStateFlow()
 
     private val _weatherDetailState = MutableStateFlow<WeatherDetailUiState>(WeatherDetailUiState.Loading)
     val weatherDetailState = _weatherDetailState.asStateFlow()
+
+    val settingsState: StateFlow<SettingsUiState> = settingsRepository.userSettingsFlow
+        .map { SettingsUiState(it) }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = SettingsUiState()
+        )
+
+    companion object {
+        lateinit var Factory: ViewModelProvider.Factory
+    }
 
     init {
         loadSavedLocations()
@@ -60,6 +80,12 @@ class WeatherViewModel(
                 .collect { data ->
                     _weatherDetailState.value = WeatherDetailUiState.Success(data)
                 }
+        }
+    }
+
+    fun updateTemperatureUnit(unit: TemperatureUnit) {
+        viewModelScope.launch {
+            settingsRepository.updateTemperatureUnit(unit)
         }
     }
 }

@@ -22,7 +22,7 @@ class FakeWeatherRepository : WeatherRepository {
     }
 
     override fun getWeatherData(locationId: String): Flow<WeatherData> = flow {
-        delay(800)
+        delay(1500)
         val location = fakeLocations.first { it.id == locationId }
         emit(generateFakeDataFor(location))
     }
@@ -52,13 +52,13 @@ class FakeWeatherRepository : WeatherRepository {
                 val time = LocalTime.of(hour, 0)
                 HourlyForecast(
                     time = time,
-                    temperature = when(hour) {
-                        in 0..5 -> 13 + hour/2
+                    temperature = when (hour) {
+                        in 0..5 -> 13 + hour / 2
                         in 6..14 -> 16 + (hour - 6)
                         in 15..21 -> 26 - (hour - 14)
                         else -> 20 - (hour - 21)
                     },
-                    conditionEnum = when(hour) {
+                    conditionEnum = when (hour) {
                         in 0..2 -> WeatherCondition.RAIN
                         in 7..16 -> WeatherCondition.SUNNY
                         in 17..20 -> WeatherCondition.PARTLY_CLOUDY
@@ -73,19 +73,22 @@ class FakeWeatherRepository : WeatherRepository {
                     date = date,
                     highTemp = 24 + Random.nextInt(-2, 3),
                     lowTemp = 15 + Random.nextInt(-2, 2),
-                    conditionEnum = WeatherCondition.values().random(),
+                    conditionEnum = WeatherCondition.entries.random(),
                     precipitationChance = Random.nextInt(10, 60)
                 )
             },
             weatherDetails = WeatherDetails(
-                windSpeed = "5 km/h",
+                windSpeed = 15,
+                windGusts = 25,
                 windDirection = "Południowo-wschodni",
                 humidity = 56,
                 dewPoint = 13,
                 pressure = 1013,
-                uvIndex = if (now.hour in 8..18) 2 else 0,
+                pressureTrend = "Stabilne",
+                uvIndex = if (now.hour in 8..18) 4 else 0,
                 visibility = "17 km",
-                cloudCover = 75
+                cloudCover = 75,
+                airQualityIndex = 42
             ),
             sunInfo = SunInfo(
                 sunrise = LocalTime.of(4, 20),
@@ -94,3 +97,4 @@ class FakeWeatherRepository : WeatherRepository {
         )
     }
 }
+
