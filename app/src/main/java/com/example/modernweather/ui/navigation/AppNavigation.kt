@@ -2,13 +2,13 @@ package com.example.modernweather.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.modernweather.ui.screens.LocationsScreen
+import com.example.modernweather.ui.screens.RadarScreen
 import com.example.modernweather.ui.screens.SettingsScreen
 import com.example.modernweather.ui.screens.WeatherDetailScreen
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
@@ -19,14 +19,13 @@ sealed class Screen(val route: String) {
         fun createRoute(locationId: String) = "weatherDetail/$locationId"
     }
     data object Settings : Screen("settings")
+    data object Radar : Screen("radar")
 }
 
 @Composable
 fun AppNavigation() {
     val navController = rememberNavController()
-    val weatherViewModel: WeatherViewModel = viewModel(
-        factory = WeatherViewModel.Factory
-    )
+    val weatherViewModel: WeatherViewModel = viewModel(factory = WeatherViewModel.Factory)
 
     NavHost(navController = navController, startDestination = Screen.Locations.route) {
         composable(Screen.Locations.route) {
@@ -50,7 +49,8 @@ fun AppNavigation() {
             WeatherDetailScreen(
                 locationId = locationId,
                 viewModel = weatherViewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNavigateToRadar = { navController.navigate(Screen.Radar.route) }
             )
         }
         composable(Screen.Settings.route) {
@@ -59,6 +59,10 @@ fun AppNavigation() {
                 onNavigateBack = { navController.popBackStack() }
             )
         }
+        composable(Screen.Radar.route) {
+            RadarScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
+        }
     }
 }
-

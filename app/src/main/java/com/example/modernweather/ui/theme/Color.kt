@@ -2,20 +2,29 @@ package com.example.modernweather.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val DarkBackground = Color(0xFF121212)
-val Surface = Color(0xFF1E1E1E)
-val OnSurface = Color(0xFFE0E0E0)
-val OnSurfaceVariant = Color(0xFFBDBDBD)
-val Primary = Color(0xFF628BFF)
-val Secondary = Color(0xFFC8C4DD)
+val Background = Color(0xFF1A1C1E)
+val DarkBackground = Color(0xFF1A1C1E)
+val Surface = Color(0xFF2C2E30)
+val OnSurface = Color(0xFFE3E3E3)
+val OnSurfaceVariant = Color(0xFFA9A9A9)
+val Primary = Color(0xFF829dff)
+val PrimaryVariant = Color(0xFF5d72c7)
 
-val AlertWarning = Color(0xFFE57373)
+val AccentBlue = Color(0xFF00A9FF)
+val AccentPink = Color(0xFFFF3F8A)
+val AccentGreen = Color(0xFF4CAF50)
+val AccentYellow = Color(0xFFFFC107)
+val AccentRed = Color(0xFFF44336)
+
+val AqiGood = Color(0xFF4CAF50)
+val AqiModerate = Color(0xFFFFC107)
+val AqiUnhealthy = Color(0xFFF44336)
+val AqiVeryUnhealthy = Color(0xFF9C27B0)
+
+val AlertWarning = Color(0xFFFFA000)
 val AlertSevere = Color(0xFFD32F2F)
 
-val BlueSky = Color(0xFF81D4FA)
-val NightSky = Color(0xFF3949AB)
+val GradientDark = Color(0xFF232526)
+val GradientLight = Color(0xFF414345)
 
-val ShimmerColor = Color(0xFF424242)
-val RadarGradientStart = Color(0x000288d1)
-val RadarGradientEnd = Color(0x990288d1)
-
+val FrostedGlassColor = Color(0x60FFFFFF)

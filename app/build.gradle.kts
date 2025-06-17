@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.skymoods.weather"
+    namespace = "com.example.modernweather"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.skymoods.weather"
+        applicationId = "com.example.modernweather"
         minSdk = 28
         targetSdk = 36
         versionCode = 1
@@ -38,11 +38,10 @@ android {
 }
 
 dependencies {
-
+    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
-    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)

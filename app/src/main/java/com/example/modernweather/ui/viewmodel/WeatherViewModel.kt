@@ -4,10 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.modernweather.data.models.Location
-import com.example.modernweather.data.models.TemperatureUnit
-import com.example.modernweather.data.models.UserSettings
-import com.example.modernweather.data.models.WeatherData
+import com.example.modernweather.data.models.*
 import com.example.modernweather.data.repository.FakeWeatherRepository
 import com.example.modernweather.data.repository.SettingsRepository
 import com.example.modernweather.data.repository.WeatherRepository
@@ -22,15 +19,21 @@ data class LocationsUiState(
 
 sealed interface WeatherDetailUiState {
     data object Loading : WeatherDetailUiState
-    data class Success(val weatherData: WeatherData) : WeatherDetailUiState
+    data class Success(val weatherData: WeatherData, val aiInsight: String) : WeatherDetailUiState
     data class Error(val message: String) : WeatherDetailUiState
 }
 
 data class SettingsUiState(
-    val userSettings: UserSettings = UserSettings(temperatureUnit = TemperatureUnit.CELSIUS)
+    val temperatureUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
+    val isSystemTheme: Boolean = true,
+    val isDarkTheme: Boolean = false
 )
 
 class WeatherViewModel(application: Application) : AndroidViewModel(application) {
+
+    companion object {
+        lateinit var Factory: ViewModelProvider.Factory
+    }
 
     private val weatherRepository: WeatherRepository = FakeWeatherRepository()
     private val settingsRepository: SettingsRepository = SettingsRepository(application)
@@ -42,16 +45,18 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     val weatherDetailState = _weatherDetailState.asStateFlow()
 
     val settingsState: StateFlow<SettingsUiState> = settingsRepository.userSettingsFlow
-        .map { SettingsUiState(it) }
+        .map {
+            SettingsUiState(
+                temperatureUnit = it.temperatureUnit,
+                isSystemTheme = it.isSystemTheme,
+                isDarkTheme = it.isDarkTheme
+            )
+        }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = SettingsUiState()
         )
-
-    companion object {
-        lateinit var Factory: ViewModelProvider.Factory
-    }
 
     init {
         loadSavedLocations()
@@ -78,14 +83,28 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     _weatherDetailState.value = WeatherDetailUiState.Error("Nie udało się załadować danych: ${e.message}")
                 }
                 .collect { data ->
-                    _weatherDetailState.value = WeatherDetailUiState.Success(data)
+                    val insight = generateAiInsight(data)
+                    _weatherDetailState.value = WeatherDetailUiState.Success(data, insight)
                 }
         }
     }
 
     fun updateTemperatureUnit(unit: TemperatureUnit) {
-        viewModelScope.launch {
-            settingsRepository.updateTemperatureUnit(unit)
+        viewModelScope.launch { settingsRepository.updateTemperatureUnit(unit) }
+    }
+
+    fun updateTheme(isSystem: Boolean, isDark: Boolean) {
+        viewModelScope.launch { settingsRepository.updateTheme(isSystem, isDark) }
+    }
+
+    private fun generateAiInsight(data: WeatherData): String {
+        val temp = data.currentWeather.temperature
+        return when (data.currentWeather.conditionEnum) {
+            WeatherCondition.SUNNY -> "Czyste niebo i słońce przez cały dzień. Idealne warunki na aktywność na zewnątrz. Pamiętaj o kremie z filtrem, indeks UV może być wysoki."
+            WeatherCondition.THUNDERSTORM -> "Uwaga! Spodziewane są gwałtowne burze z silnym wiatrem. Unikaj otwartych przestrzeni i zabezpiecz luźne przedmioty na balkonie."
+            WeatherCondition.RAIN -> "Spodziewaj się przelotnych opadów deszczu. Warto zabrać ze sobą parasol lub kurtkę przeciwdeszczową. Drogi mogą być śliskie."
+            WeatherCondition.SNOW -> "Zimowa aura w pełni. Opady śniegu mogą powodować utrudnienia w ruchu. Ubierz się ciepło i zachowaj ostrożność na chodnikach."
+            else -> "Pogoda będzie zmienna. Aktualnie temperatura wynosi $temp°C. W ciągu dnia możliwe są zarówno chwile ze słońcem, jak i przelotne opady. Bądź gotowy na wszystko."
         }
     }
 }

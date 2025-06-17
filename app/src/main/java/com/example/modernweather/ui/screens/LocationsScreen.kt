@@ -49,7 +49,7 @@ fun LocationsScreen(
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
         Column(modifier = Modifier.padding(paddingValues).padding(horizontal = 16.dp)) {
-            SearchBar() // Teraz ta funkcja będzie zdefiniowana poniżej
+            SearchBar()
             when {
                 uiState.isLoading -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -86,7 +86,7 @@ fun LocationsScreen(
 
 @Composable
 private fun SearchBar() {
-    // Prosta, nieaktywna implementacja paska wyszukiwania
+
     OutlinedTextField(
         value = "",
         onValueChange = {},

@@ -5,6 +5,7 @@ enum class TemperatureUnit {
 }
 
 data class UserSettings(
-    val temperatureUnit: TemperatureUnit
+    val temperatureUnit: TemperatureUnit,
+    val isSystemTheme: Boolean,
+    val isDarkTheme: Boolean
 )
-

@@ -4,8 +4,12 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.modernweather.ui.navigation.AppNavigation
 import com.example.modernweather.ui.theme.ModernWeatherTheme
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
@@ -29,7 +33,16 @@ class MainActivity : ComponentActivity() {
         WeatherViewModel.Factory = viewModelFactory
 
         setContent {
-            ModernWeatherTheme {
+            val viewModel: WeatherViewModel = viewModel(factory = WeatherViewModel.Factory)
+            val settingsState by viewModel.settingsState.collectAsState()
+
+            val useDarkTheme = if (settingsState.isSystemTheme) {
+                isSystemInDarkTheme()
+            } else {
+                settingsState.isDarkTheme
+            }
+
+            ModernWeatherTheme(darkTheme = useDarkTheme) {
                 AppNavigation()
             }
         }

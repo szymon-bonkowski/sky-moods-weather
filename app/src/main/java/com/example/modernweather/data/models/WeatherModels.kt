@@ -52,16 +52,16 @@ data class WeatherAlert(
 )
 
 data class WeatherDetails(
-    val windSpeed: Int, // km/h
-    val windGusts: Int, // km/h
+    val windSpeed: Int,
+    val windGusts: Int,
     val windDirection: String,
-    val humidity: Int, // w %
-    val dewPoint: Int, // w °C
-    val pressure: Int, // w hPa
-    val pressureTrend: String, // "Rising", "Falling", "Steady"
+    val humidity: Int,
+    val dewPoint: Int,
+    val pressure: Int,
+    val pressureTrend: String,
     val uvIndex: Int,
     val visibility: String,
-    val cloudCover: Int, // w %
+    val cloudCover: Int,
     val airQualityIndex: Int
 )
 
