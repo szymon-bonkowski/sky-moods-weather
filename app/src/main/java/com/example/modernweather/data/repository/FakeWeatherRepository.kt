@@ -39,7 +39,7 @@ class FakeWeatherRepository : WeatherRepository {
                 highTemp = 26,
                 lowTemp = 13,
                 condition = "Przeważnie pochmurno",
-                conditionEnum = WeatherCondition.PARTLY_CLOUDY
+                conditionEnum = WeatherCondition.DAY_PARTLY_CLOUDY
             ),
             alert = WeatherAlert(
                 id = "alert1",
@@ -59,24 +59,23 @@ class FakeWeatherRepository : WeatherRepository {
                         else -> 20 - (hour - 21)
                     },
                     conditionEnum = when (hour) {
-                        in 0..2 -> WeatherCondition.RAIN
-                        in 7..16 -> WeatherCondition.SUNNY
-                        in 17..20 -> WeatherCondition.PARTLY_CLOUDY
-                        else -> WeatherCondition.CLOUDY
+                        in 0..2 -> WeatherCondition.NIGHT_RAIN_LIGHT
+                        in 7..16 -> WeatherCondition.DAY_SUNNY
+                        in 17..20 -> WeatherCondition.DAY_PARTLY_CLOUDY
+                        else -> WeatherCondition.DAY_CLOUDY
                     },
                     precipitationChance = if (hour in 0..3 || hour > 22) Random.nextInt(40, 90) else Random.nextInt(0, 15)
                 )
             },
-            dailyForecast = (0..6).map { day ->
-                val date = today.plusDays(day.toLong())
-                DailyForecast(
-                    date = date,
-                    highTemp = 24 + Random.nextInt(-2, 3),
-                    lowTemp = 15 + Random.nextInt(-2, 2),
-                    conditionEnum = WeatherCondition.entries.random(),
-                    precipitationChance = Random.nextInt(10, 60)
-                )
-            },
+            dailyForecast = listOf(
+                DailyForecast(today.plusDays(0), 26, 14, WeatherCondition.DAY_SUNNY, 10),
+                DailyForecast(today.plusDays(1), 24, 13, WeatherCondition.DAY_RAIN_LIGHT, 90),
+                DailyForecast(today.plusDays(2), 23, 15, WeatherCondition.DAY_THUNDERSTORM, 50),
+                DailyForecast(today.plusDays(3), 22, 16, WeatherCondition.DAY_SNOW, 35),
+                DailyForecast(today.plusDays(4), 25, 16, WeatherCondition.DAY_PARTLY_CLOUDY, 40),
+                DailyForecast(today.plusDays(5), 26, 16, WeatherCondition.DAY_WIND_CLOUDY, 12),
+                DailyForecast(today.plusDays(6), 24, 17, WeatherCondition.DAY_FOG, 5)
+            ),
             weatherDetails = WeatherDetails(
                 windSpeed = 15,
                 windGusts = 25,
@@ -97,4 +96,3 @@ class FakeWeatherRepository : WeatherRepository {
         )
     }
 }
-

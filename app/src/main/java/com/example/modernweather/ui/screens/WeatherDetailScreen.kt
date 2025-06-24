@@ -164,7 +164,7 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, onNavigateToRadar: () 
                 WeeklyForecastChart(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(280.dp),
+                        .height(300.dp),
                     dailyForecasts = data.dailyForecast,
                     unit = unit
                 )
@@ -347,14 +347,16 @@ fun HourlyItem(forecast: HourlyForecast, unit: TemperatureUnit) {
 
 private fun mapConditionToIconFromHourly(condition: WeatherCondition): ImageVector {
     return when (condition) {
-        WeatherCondition.SUNNY -> Icons.Default.WbSunny
-        WeatherCondition.PARTLY_CLOUDY -> Icons.Default.WbCloudy
-        WeatherCondition.CLOUDY -> Icons.Default.Cloud
-        WeatherCondition.RAIN -> Icons.Outlined.WaterDrop
-        WeatherCondition.HEAVY_RAIN -> Icons.Default.Grain
-        WeatherCondition.THUNDERSTORM -> Icons.Default.Thunderstorm
-        WeatherCondition.SNOW -> Icons.Default.AcUnit
-        WeatherCondition.FOG -> Icons.Default.Dehaze
+        WeatherCondition.DAY_SUNNY, WeatherCondition.NIGHT_CLEAR -> Icons.Default.WbSunny
+        WeatherCondition.DAY_PARTLY_CLOUDY, WeatherCondition.NIGHT_PARTLY_CLOUDY -> Icons.Default.WbCloudy
+        WeatherCondition.DAY_CLOUDY, WeatherCondition.NIGHT_CLOUDY -> Icons.Default.Cloud
+        WeatherCondition.DAY_RAIN_LIGHT, WeatherCondition.DAY_RAIN_MEDIUM, WeatherCondition.NIGHT_RAIN_LIGHT, WeatherCondition.NIGHT_RAIN_MEDIUM -> Icons.Outlined.WaterDrop
+        WeatherCondition.DAY_RAIN_HEAVY -> Icons.Default.Grain
+        WeatherCondition.DAY_THUNDERSTORM, WeatherCondition.NIGHT_THUNDERSTORM, WeatherCondition.DAY_THUNDERSTORM_HEAVY -> Icons.Default.Thunderstorm
+        WeatherCondition.DAY_SNOW, WeatherCondition.NIGHT_SNOW -> Icons.Default.AcUnit
+        WeatherCondition.DAY_FOG, WeatherCondition.NIGHT_FOG, WeatherCondition.DAY_FOG_CLOUDY -> Icons.Default.Dehaze
+        WeatherCondition.DAY_WIND, WeatherCondition.NIGHT_WIND, WeatherCondition.DAY_WIND_CLOUDY -> Icons.Default.Air
+        else -> Icons.Default.Cloud
     }
 }
 
