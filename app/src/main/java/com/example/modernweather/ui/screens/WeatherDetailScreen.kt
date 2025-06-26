@@ -1,3 +1,4 @@
+
 package com.example.modernweather.ui.screens
 
 import androidx.compose.animation.*
@@ -27,10 +28,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -50,7 +52,6 @@ import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
-import java.time.format.TextStyle
 import java.util.*
 
 fun toFahrenheit(celsius: Int): Int {
@@ -451,7 +452,9 @@ fun RadarCard(onClick: () -> Unit) {
 @Composable
 fun SunCycleSection(sunInfo: SunInfo) {
     val now = LocalTime.now()
-    val totalDaylightMinutes = Duration.between(sunInfo.sunrise, sunInfo.sunset).toMinutes().toFloat()
+    val totalDaylightDuration = Duration.between(sunInfo.sunrise, sunInfo.sunset)
+    val totalDaylightMinutes = totalDaylightDuration.toMinutes().toFloat()
+
     val elapsedMinutes = if (now.isAfter(sunInfo.sunrise) && now.isBefore(sunInfo.sunset)) {
         Duration.between(sunInfo.sunrise, now).toMinutes().toFloat()
     } else if (now.isAfter(sunInfo.sunset)) {
@@ -463,16 +466,46 @@ fun SunCycleSection(sunInfo: SunInfo) {
     val progress = (elapsedMinutes / totalDaylightMinutes).coerceIn(0f, 1f)
     val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1500), label = "sun_progress")
 
+    val daylightHours = totalDaylightDuration.toHours()
+    val daylightMinutes = totalDaylightDuration.toMinutes() % 60
+
     TitledCard(title = "WSCHÓD I ZACHÓD SŁOŃCA") {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier
+                .padding(16.dp)
+                .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             SunArc(progress = animatedProgress)
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Wschód: ${sunInfo.sunrise.format(DateTimeFormatter.ofPattern("HH:mm"))}")
-                Text("Zachód: ${sunInfo.sunset.format(DateTimeFormatter.ofPattern("HH:mm"))}")
+            Spacer(Modifier.height(8.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Wschód", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        sunInfo.sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Text(
+                    "${daylightHours}h ${daylightMinutes}m światła dziennego",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Zachód", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        sunInfo.sunset.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -480,44 +513,106 @@ fun SunCycleSection(sunInfo: SunInfo) {
 
 @Composable
 fun SunArc(progress: Float) {
-    val sunColor = MaterialTheme.colorScheme.primary
-    val arcColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+    val sunriseColor = Color(0xFFFFC400)
+    val sunsetColor = Color(0xFFFF6F00)
+    val arcTrackColor = MaterialTheme.colorScheme.surfaceVariant
+    val skyColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
+    val sunColor = Color.White
+    val sunGlow = sunriseColor.copy(alpha = 0.5f)
 
     Canvas(modifier = Modifier
         .fillMaxWidth()
-        .height(120.dp)) {
-        val stroke = Stroke(width = 4f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 10f), 0f))
+        .height(130.dp)
+        .padding(horizontal = 16.dp)) {
+        val canvasWidth = size.width
+        val canvasHeight = size.height
+        val arcRadius = canvasWidth / 2f
+        val arcCenter = Offset(x = canvasWidth / 2f, y = canvasHeight * 0.9f)
+        val arcSize = Size(width = arcRadius * 2, height = arcRadius * 2)
+        val arcTopLeft = Offset(arcCenter.x - arcRadius, arcCenter.y - arcRadius)
+        val horizonY = arcCenter.y
 
-        val arcSize = Size(width = size.width * 0.7f, height = size.width * 0.7f)
-        val arcTopLeft = Offset(x = (size.width - arcSize.width) / 2f, y = size.height * 0.3f)
+        drawLine(
+            color = arcTrackColor,
+            start = Offset(0f, horizonY),
+            end = Offset(canvasWidth, horizonY),
+            strokeWidth = 3f
+        )
 
         drawArc(
-            color = arcColor,
+            color = arcTrackColor,
             startAngle = 180f,
             sweepAngle = 180f,
             useCenter = false,
             topLeft = arcTopLeft,
             size = arcSize,
-            style = stroke
+            style = Stroke(width = 6f)
         )
 
-        val angle = (180 * progress) + 180
-        val angleRad = Math.toRadians(angle.toDouble()).toFloat()
-        val radius = arcSize.width / 2f
-        val sunX = center.x + radius * kotlin.math.cos(angleRad)
-        val sunY = (arcTopLeft.y + radius) + radius * kotlin.math.sin(angleRad)
+        val arcGradient = Brush.linearGradient(
+            colors = listOf(sunriseColor, sunsetColor),
+            start = Offset(0f, horizonY),
+            end = Offset(canvasWidth, horizonY)
+        )
+        if (progress > 0f) {
+            drawArc(
+                brush = arcGradient,
+                startAngle = 180f,
+                sweepAngle = 180 * progress,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = 6f)
+            )
+        }
+
+        val skyPath = Path().apply {
+            moveTo(0f, horizonY)
+            addArc(
+                oval = Rect(
+                    left = arcTopLeft.x,
+                    top = arcTopLeft.y,
+                    right = arcTopLeft.x + arcSize.width,
+                    bottom = arcTopLeft.y + arcSize.height
+                ),
+                startAngleDegrees = 180f,
+                sweepAngleDegrees = 180f
+            )
+            lineTo(canvasWidth, horizonY)
+            close()
+        }
+        drawPath(
+            path = skyPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(skyColor, Color.Transparent),
+                startY = arcCenter.y - arcRadius,
+                endY = horizonY
+            )
+        )
+
+        val angleRad = Math.toRadians((180 * progress) + 180.0).toFloat()
+        val sunX = arcCenter.x + arcRadius * kotlin.math.cos(angleRad)
+        val sunY = arcCenter.y + arcRadius * kotlin.math.sin(angleRad)
+        val sunPosition = Offset(sunX, sunY)
 
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(sunColor.copy(alpha = 0.3f), Color.Transparent)
+                colors = listOf(sunGlow, Color.Transparent),
+                center = sunPosition,
+                radius = 32.dp.toPx()
             ),
-            radius = 24f,
-            center = Offset(sunX, sunY)
+            radius = 32.dp.toPx(),
+            center = sunPosition
         )
         drawCircle(
             color = sunColor,
-            radius = 12f,
-            center = Offset(sunX, sunY)
+            radius = 12.dp.toPx(),
+            center = sunPosition
+        )
+        drawCircle(
+            color = sunsetColor,
+            radius = 6.dp.toPx(),
+            center = sunPosition
         )
     }
 }

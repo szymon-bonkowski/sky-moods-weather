@@ -14,7 +14,7 @@ val AccentBlue = Color(0xFF00A9FF)
 val AccentPink = Color(0xFFFF3F8A)
 val AccentGreen = Color(0xFF4CAF50)
 val AccentYellow = Color(0xFFFFC107)
-val AccentRed = Color(0xFFF44336)
+val AccentRed = Color(0xFFFD5656)
 
 val AqiGood = Color(0xFF4CAF50)
 val AqiModerate = Color(0xFFFFC107)
