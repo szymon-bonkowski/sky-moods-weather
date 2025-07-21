@@ -1,0 +1,60 @@
+@Composable
+fun SunArc(progress: Float) {
+    val sunColor = MaterialTheme.colorScheme.primary
+    val arcColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(150.dp)
+            .padding(horizontal = 16.dp)
+    ) {
+        val diameter = min(size.width, size.height) * 0.8f
+        val arcSize = Size(width = diameter, height = diameter)
+        val arcTopLeft = Offset(
+            x = (size.width - diameter) / 2f,
+            y = (size.height - diameter) / 2f
+        )
+
+        // Draw arc
+        drawArc(
+            color = arcColor,
+            startAngle = 0f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = Stroke(width = 4f, cap = StrokeCap.Round)
+        )
+
+        // Calculate sun position
+        val arcCenterX = arcTopLeft.x + arcSize.width / 2
+        val arcCenterY = arcTopLeft.y + arcSize.height / 2
+        val angle = 180f - (180f * progress)
+        val angleRad = Math.toRadians(angle.toDouble()).toFloat()
+        val radius = arcSize.width / 2f
+
+        val sunX = arcCenterX + radius * cos(angleRad)
+        val sunY = arcCenterY + radius * sin(angleRad)
+
+        // Draw sun glow
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    sunColor.copy(alpha = 0.3f),
+                    Color.Transparent
+                ),
+                radius = 36f
+            ),
+            radius = 36f,
+            center = Offset(sunX, sunY)
+        )
+
+        // Draw sun
+        drawCircle(
+            color = sunColor,
+            radius = 12f,
+            center = Offset(sunX, sunY)
+        )
+    }
+}

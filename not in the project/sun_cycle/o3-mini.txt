@@ -1,0 +1,66 @@
+@Composable
+fun SunArc(progress: Float) {
+    // Używamy kluczowych kolorów z MaterialTheme, tak aby wykres był spójny z resztą aplikacji.
+    val sunColor = MaterialTheme.colorScheme.primary
+    val arcStartColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+    val arcEndColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f)
+    
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp) // lekko zwiększona wysokość dla lepszej przestrzeni
+    ) {
+        // Ustalamy rozmiar łuku jako 70% szerokości Canvasa
+        val arcSize = Size(width = size.width * 0.7f, height = size.width * 0.7f)
+        // Pozycjonujemy łuk centralnie w poziomie i nieco wyżej, by zrobić miejsce na opisy poniżej
+        val arcTopLeft = Offset(x = (size.width - arcSize.width) / 2f, y = size.height * 0.2f)
+        
+        // Rysujemy ciągły łuk z gradientowym przejściem
+        drawArc(
+            brush = Brush.horizontalGradient(
+                colors = listOf(arcStartColor, arcEndColor)
+            ),
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = Stroke(width = 6f) // zwiększona grubość dla lepszej widoczności
+        )
+        
+        // Obliczamy aktualny kąt słońca na torze (od 180° do 360°)
+        val angle = (180f * progress) + 180f
+        val angleRad = Math.toRadians(angle.toDouble()).toFloat()
+        val radius = arcSize.width / 2f
+        // Obliczamy pozycję środka łuku (punkt startowy łuku + kolejny wektor)
+        val sunX = (arcTopLeft.x + radius) + radius * kotlin.math.cos(angleRad)
+        val sunY = (arcTopLeft.y + radius) + radius * kotlin.math.sin(angleRad)
+        
+        // Rysujemy główny wskaźnik postępu – okrąg reprezentujący słońce
+        drawCircle(
+            color = sunColor,
+            radius = 14f,
+            center = Offset(sunX, sunY)
+        )
+        
+        // Rysujemy marker w punkcie wschodu (kąt 180°)
+        val sunriseAngleRad = Math.toRadians(180.0).toFloat()
+        val sunriseX = arcTopLeft.x + radius + radius * kotlin.math.cos(sunriseAngleRad)
+        val sunriseY = arcTopLeft.y + radius + radius * kotlin.math.sin(sunriseAngleRad)
+        drawCircle(
+            color = MaterialTheme.colorScheme.secondary,
+            radius = 8f,
+            center = Offset(sunriseX, sunriseY)
+        )
+        
+        // Rysujemy marker w punkcie zachodu (kąt 360°, czyli 0°)
+        val sunsetAngleRad = Math.toRadians(360.0).toFloat()
+        val sunsetX = arcTopLeft.x + radius + radius * kotlin.math.cos(sunsetAngleRad)
+        val sunsetY = arcTopLeft.y + radius + radius * kotlin.math.sin(sunsetAngleRad)
+        drawCircle(
+            color = MaterialTheme.colorScheme.secondary,
+            radius = 8f,
+            center = Offset(sunsetX, sunsetY)
+        )
+    }
+}

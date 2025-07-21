@@ -10,4 +10,3 @@ data class WeatherData(
     val sunInfo: SunInfo
 )
 
-

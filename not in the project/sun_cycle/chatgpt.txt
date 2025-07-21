@@ -1,0 +1,99 @@
+@Composable
+fun SunCycleSection(sunInfo: SunInfo) {
+    val now = LocalTime.now()
+    val totalDaylight = Duration.between(sunInfo.sunrise, sunInfo.sunset).toMinutes().toFloat()
+    val elapsed = when {
+        now.isAfter(sunInfo.sunrise) && now.isBefore(sunInfo.sunset) -> Duration.between(sunInfo.sunrise, now).toMinutes().toFloat()
+        now.isAfter(sunInfo.sunset) -> totalDaylight
+        else -> 0f
+    }
+    val progress = (elapsed / totalDaylight).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 1500),
+        label = "sun_progress"
+    )
+
+    TitledCard(title = "WSCHÓD I ZACHÓD SŁOŃCA") {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            SunArc(progress = animatedProgress)
+            Spacer(Modifier.height(12.dp))
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Wschód: ${sunInfo.sunrise.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "Zachód: ${sunInfo.sunset.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SunArc(progress: Float) {
+    val strokePx = 6.dp.toPx()
+    val baseColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+    ) {
+        val diameter = size.minDimension * 0.8f
+        val offset = Offset((size.width - diameter) / 2f, size.height - diameter / 2f)
+
+        // Draw background arc
+        drawArc(
+            color = baseColor,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = offset,
+            size = Size(diameter, diameter),
+            style = Stroke(width = strokePx, cap = StrokeCap.Round)
+        )
+
+        // Draw progress arc
+        drawArc(
+            color = primaryColor,
+            startAngle = 180f,
+            sweepAngle = 180f * progress,
+            useCenter = false,
+            topLeft = offset,
+            size = Size(diameter, diameter),
+            style = Stroke(width = strokePx, cap = StrokeCap.Round)
+        )
+
+        // Calculate sun position
+        val center = Offset(size.width / 2f, size.height - diameter / 2f)
+        val angleRad = Math.toRadians(180.0 + 180.0 * progress)
+        val x = center.x + (diameter / 2f) * kotlin.math.cos(angleRad).toFloat()
+        val y = center.y + (diameter / 2f) * kotlin.math.sin(angleRad).toFloat()
+
+        // Draw sun indicator
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(primaryColor.copy(alpha = 0.3f), Color.Transparent)
+            ),
+            radius = 16.dp.toPx(),
+            center = Offset(x, y)
+        )
+        drawCircle(
+            color = primaryColor,
+            radius = 8.dp.toPx(),
+            center = Offset(x, y)
+        )
+    }
+}

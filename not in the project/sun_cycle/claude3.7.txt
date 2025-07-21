@@ -1,0 +1,186 @@
+@Composable
+fun SunCycleSection(sunInfo: SunInfo) {
+    val now = LocalTime.now()
+    val totalDaylightMinutes = Duration.between(sunInfo.sunrise, sunInfo.sunset).toMinutes().toFloat()
+    val elapsedMinutes = if (now.isAfter(sunInfo.sunrise) && now.isBefore(sunInfo.sunset)) {
+        Duration.between(sunInfo.sunrise, now).toMinutes().toFloat()
+    } else if (now.isAfter(sunInfo.sunset)) {
+        totalDaylightMinutes
+    } else {
+        0f
+    }
+
+    val progress = (elapsedMinutes / totalDaylightMinutes).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress, 
+        animationSpec = tween(1500, easing = FastOutSlowInEasing), 
+        label = "sun_progress"
+    )
+
+    TitledCard(title = "WSCHÓD I ZACHÓD SŁOŃCA") {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 24.dp)
+        ) {
+            SunArc(
+                progress = animatedProgress,
+                sunriseTime = sunInfo.sunrise,
+                sunsetTime = sunInfo.sunset
+            )
+        }
+    }
+}
+
+@Composable
+fun SunArc(progress: Float, sunriseTime: LocalTime, sunsetTime: LocalTime) {
+    val sunColor = MaterialTheme.colorScheme.primary
+    val sunGlowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+    val arcBackgroundColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+    val arcActiveColor = MaterialTheme.colorScheme.primary
+    val sunriseText = sunriseTime.format(DateTimeFormatter.ofPattern("HH:mm"))
+    val sunsetText = sunsetTime.format(DateTimeFormatter.ofPattern("HH:mm"))
+    
+    // Animation for the glow effect
+    val glowRadius by animateFloatAsState(
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "glow_animation"
+    )
+
+    Canvas(modifier = Modifier
+        .fillMaxWidth()
+        .height(140.dp)
+        .padding(bottom = 16.dp)
+    ) {
+        val width = size.width
+        val height = size.height - 24.dp // Leave space for text at bottom
+        
+        val arcWidth = width * 0.85f
+        val arcHeight = arcWidth * 0.5f
+        val arcTopLeft = Offset(x = (width - arcWidth) / 2f, y = 0f)
+        val arcSize = Size(width = arcWidth, height = arcHeight * 2)
+
+        // Draw time markers
+        val textPaint = Paint().asFrameworkPaint().apply {
+            isAntiAlias = true
+            textSize = 12.sp.toPx()
+            color = android.graphics.Color.WHITE
+            textAlign = android.graphics.Paint.Align.CENTER
+        }
+        
+        // Draw sunrise text
+        drawContext.canvas.nativeCanvas.drawText(
+            "Wschód: $sunriseText",
+            width * 0.2f,
+            height - 8.dp.toPx(),
+            textPaint
+        )
+        
+        // Draw sunset text
+        drawContext.canvas.nativeCanvas.drawText(
+            "Zachód: $sunsetText",
+            width * 0.8f,
+            height - 8.dp.toPx(),
+            textPaint
+        )
+
+        // Draw inactive arc background
+        drawArc(
+            color = arcBackgroundColor,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+        )
+
+        // Draw active arc path (progress)
+        if (progress > 0f) {
+            val activeSweepAngle = 180f * progress
+            
+            // Draw gradient for active path
+            val gradient = Brush.linearGradient(
+                colors = listOf(
+                    Color(0xFFFF9800), // Sunrise orange
+                    Color(0xFFFFC107), // Middle yellow
+                    Color(0xFFFF5722)  // Sunset orange-red
+                ),
+                start = Offset(arcTopLeft.x, arcTopLeft.y + arcHeight),
+                end = Offset(arcTopLeft.x + arcWidth, arcTopLeft.y + arcHeight)
+            )
+            
+            drawArc(
+                brush = gradient,
+                startAngle = 180f,
+                sweepAngle = activeSweepAngle,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = 5.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
+
+        // Calculate sun position
+        val angle = (180 * progress) + 180
+        val angleRad = Math.toRadians(angle.toDouble()).toFloat()
+        val radius = arcSize.width / 2f
+        val centerX = arcTopLeft.x + arcSize.width / 2f
+        val centerY = arcTopLeft.y + arcHeight
+        val sunX = centerX + radius * kotlin.math.cos(angleRad)
+        val sunY = centerY + radius * kotlin.math.sin(angleRad)
+        val sunPosition = Offset(sunX, sunY)
+
+        // Draw sun glow
+        val glowSize = 32.dp.toPx() * (0.8f + (glowRadius * 0.4f))
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    sunColor.copy(alpha = 0.5f),
+                    sunColor.copy(alpha = 0.3f),
+                    sunColor.copy(alpha = 0.0f),
+                ),
+                center = sunPosition,
+                radius = glowSize
+            ),
+            radius = glowSize,
+            center = sunPosition
+        )
+
+        // Draw sun circle
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFFFEB3B), // Bright yellow center
+                    Color(0xFFFF9800), // Orange edge
+                ),
+                center = sunPosition,
+                radius = 12.dp.toPx()
+            ),
+            radius = 12.dp.toPx(),
+            center = sunPosition
+        )
+
+        // Draw small time markers along the arc
+        val markers = listOf(0.25f, 0.5f, 0.75f)
+        markers.forEach { markerPosition ->
+            val markerAngle = (180 * markerPosition) + 180
+            val markerAngleRad = Math.toRadians(markerAngle.toDouble()).toFloat()
+            val markerX = centerX + radius * kotlin.math.cos(markerAngleRad)
+            val markerY = centerY + radius * kotlin.math.sin(markerAngleRad)
+            
+            val markerAlpha = if (progress >= markerPosition) 0.9f else 0.3f
+            val markerColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = markerAlpha)
+            
+            drawCircle(
+                color = markerColor,
+                radius = 2.dp.toPx(),
+                center = Offset(markerX, markerY)
+            )
+        }
+    }
+}

@@ -1,0 +1,60 @@
+@Composable
+fun SunArc(progress: Float) {
+    val sunColor = MaterialTheme.colorScheme.primary
+    val arcProgressColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+    val arcBackgroundColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.1f)
+    val sunGlowColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
+
+    Canvas(modifier = Modifier
+        .fillMaxWidth()
+        .height(120.dp)) {
+        
+        val strokeWidth = 2.dp.toPx()
+        val arcSize = Size(width = size.width * 0.7f, height = size.width * 0.7f)
+        val arcTopLeft = Offset(x = (size.width - arcSize.width) / 2f, y = size.height * 0.3f)
+
+        // Tło łuku (cała możliwa ścieżka)
+        drawArc(
+            color = arcBackgroundColor,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = Stroke(width = strokeWidth)
+        )
+
+        // Aktywna część łuku (aktualny postęp)
+        drawArc(
+            color = arcProgressColor,
+            startAngle = 180f,
+            sweepAngle = 180f * progress,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = Stroke(width = strokeWidth)
+        )
+
+        val angle = (180 * progress) + 180
+        val angleRad = Math.toRadians(angle.toDouble()).toFloat()
+        val radius = arcSize.width / 2f
+        val sunX = center.x + radius * kotlin.math.cos(angleRad)
+        val sunY = (arcTopLeft.y + radius) + radius * kotlin.math.sin(angleRad)
+
+        // Efekt poświaty słońca
+        drawCircle(
+            brush = Brush.radialGradient(
+                0.0f to sunGlowColor,
+                1.0f to Color.Transparent,
+                center = Offset(sunX, sunY),
+            radius = 20f,
+            center = Offset(sunX, sunY)
+        )
+        
+        // Główna kula słoneczna
+        drawCircle(
+            color = sunColor,
+            radius = 10f,
+            center = Offset(sunX, sunY)
+    }
+}

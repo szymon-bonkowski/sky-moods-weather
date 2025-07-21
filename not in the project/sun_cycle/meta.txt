@@ -1,0 +1,43 @@
+@Composable
+fun SunArc(progress: Float) {
+    val sunColor = MaterialTheme.colorScheme.primary
+    val arcColor = MaterialTheme.colorScheme.secondary // Changed to secondary color
+
+    Canvas(modifier = Modifier
+        .fillMaxWidth()
+        .height(120.dp)) {
+        val stroke = Stroke(width = 4f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(15f, 10f), 0f))
+
+        val arcSize = Size(width = size.width * 0.8f, height = size.width * 0.8f) // Adjusted arc size
+        val arcTopLeft = Offset(x = (size.width - arcSize.width) / 2f, y = size.height * 0.2f) // Adjusted arc position
+
+        drawArc(
+            color = arcColor,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = stroke
+        )
+
+        val angle = (180 * progress) + 180
+        val angleRad = Math.toRadians(angle.toDouble()).toFloat()
+        val radius = arcSize.width / 2f
+        val sunX = center.x + radius * kotlin.math.cos(angleRad)
+        val sunY = (arcTopLeft.y + radius) + radius * kotlin.math.sin(angleRad)
+
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(sunColor.copy(alpha = 0.3f), Color.Transparent)
+            ),
+            radius = 24f,
+            center = Offset(sunX, sunY)
+        )
+        drawCircle(
+            color = sunColor,
+            radius = 12f,
+            center = Offset(sunX, sunY)
+        )
+    }
+}

@@ -97,6 +97,20 @@ class WeatherViewModel(application: Application) : ViewModel() {
         }
     }
 
+    fun setTestValues(currentTime: java.time.LocalTime, sunrise: java.time.LocalTime, sunset: java.time.LocalTime) {
+        (weatherRepository as? FakeWeatherRepository)?.setTestValues(currentTime, sunrise, sunset)
+    }
+
+    fun resetToRealTime() {
+        (weatherRepository as? FakeWeatherRepository)?.resetToRealTime()
+    }
+
+    fun getCurrentTime(): java.time.LocalTime {
+        return (weatherRepository as? FakeWeatherRepository)?.let { repo ->
+            repo.testTime ?: java.time.LocalTime.now()
+        } ?: java.time.LocalTime.now()
+    }
+
     private fun generateAiInsight(data: WeatherData): String {
         val temp = data.currentWeather.temperature
         return when (data.currentWeather.conditionEnum) {

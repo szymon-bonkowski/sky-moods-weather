@@ -37,6 +37,7 @@ import java.time.format.TextStyle as JavaTextStyle
 import java.util.Locale
 import kotlin.math.abs
 
+// Data structure to hold all positioning info for a single day's forecast
 private data class ForecastPoint(
     val index: Int,
     val date: LocalDate,
@@ -46,8 +47,10 @@ private data class ForecastPoint(
     val xPosition: Float = 0f,
     val highYRaw: Float = 0f,
     val lowYRaw: Float = 0f,
+    // Adjusted positions to avoid overlap
     var highYPosition: Float = 0f,
     var lowYPosition: Float = 0f,
+    // Elements regions
     var highIconRegion: Region = Region(0f, 0f, 0f, 0f),
     var lowIconRegion: Region = Region(0f, 0f, 0f, 0f),
     var highTempRegion: Region = Region(0f, 0f, 0f, 0f),
@@ -55,6 +58,7 @@ private data class ForecastPoint(
     var dayLabelRegion: Region = Region(0f, 0f, 0f, 0f)
 )
 
+// Region to track space occupied by chart elements
 private data class Region(
     val left: Float,
     val top: Float,
@@ -83,6 +87,7 @@ fun WeeklyForecastChart(
     }
 
     Canvas(modifier = modifier.fillMaxSize()) {
+        // Constants for layout
         val xPadding = 24.dp.toPx()
         val yTopPadding = 15.dp.toPx()
         val yBottomPadding = 60.dp.toPx()
@@ -90,16 +95,19 @@ fun WeeklyForecastChart(
         val chartHeight = size.height - yTopPadding - yBottomPadding
         val xStep = chartWidth / (dailyForecasts.size - 1).coerceAtLeast(1)
         val iconSize = 24.dp.toPx()
-        val minIconSpacing = 36.dp.toPx()
+        val minIconSpacing = 36.dp.toPx() // Minimum vertical space between high and low icons
         val tempTextHeight = 16.sp.toPx() + 4.dp.toPx()
 
+        // Get temperature range and calculate mappings
         val (minTemp, maxTemp) = getMinMaxTemperatures(dailyForecasts, unit)
         val tempRange = (maxTemp - minTemp).coerceAtLeast(1f)
 
+        // Create initial forecast points based on raw temperature values
         val forecastPoints = dailyForecasts.mapIndexed { index, forecast ->
             val highTempF = toFahrenheitAware(forecast.highTemp, unit).toFloat()
             val lowTempF = toFahrenheitAware(forecast.lowTemp, unit).toFloat()
 
+            // Calculate raw Y positions based on temperature
             val highYRaw = yTopPadding + (1f - (highTempF - minTemp) / tempRange) * chartHeight
             val lowYRaw = yTopPadding + (1f - (lowTempF - minTemp) / tempRange) * chartHeight
 
@@ -115,16 +123,22 @@ fun WeeklyForecastChart(
             )
         }
 
+        // Adjust positions to ensure minimum spacing between high and low temperature elements
         adjustForecastPositions(forecastPoints, minIconSpacing, iconSize, tempTextHeight, chartHeight, yTopPadding)
 
+        // Calculate regions for all elements to avoid overlapping
         calculateElementRegions(forecastPoints, textMeasurer, unit, iconSize, density)
 
+        // Draw vertical grid lines with gaps for elements
         drawGridLines(forecastPoints, yTopPadding, size.height - yBottomPadding)
 
+        // Draw the temperature lines
         drawTemperatureLines(forecastPoints, AccentYellow, AccentBlue, animationProgress.value, iconSize)
 
+        // Draw day labels and temperatures
         drawLabels(forecastPoints, textMeasurer, unit, size)
 
+        // Draw weather icons
         forecastPoints.forEachIndexed { index, point ->
             drawWeatherIcon(dayPainters[index], point.xPosition, point.highYPosition, iconSize, animationProgress.value)
             drawWeatherIcon(nightPainters[index], point.xPosition, point.lowYPosition, iconSize, animationProgress.value)
@@ -140,20 +154,25 @@ private fun adjustForecastPositions(
     chartHeight: Float,
     topPadding: Float
 ) {
+    // Initial pass: set positions to raw calculated positions
     points.forEach { point ->
         point.highYPosition = point.highYRaw
         point.lowYPosition = point.lowYRaw
     }
 
+    // Second pass: ensure minimum spacing between high and low points
     points.forEach { point ->
         val currentSpacing = abs(point.lowYPosition - point.highYPosition)
 
+        // If spacing is too small, adjust both high and low positions
         if (currentSpacing < minSpacing) {
             val adjustment = (minSpacing - currentSpacing) / 2
 
+            // Move high point up and low point down
             point.highYPosition -= adjustment
             point.lowYPosition += adjustment
 
+            // Ensure we don't go out of bounds
             if (point.highYPosition < topPadding + iconSize/2) {
                 val highOverflow = topPadding + iconSize/2 - point.highYPosition
                 point.highYPosition = topPadding + iconSize/2
@@ -164,14 +183,17 @@ private fun adjustForecastPositions(
                 val lowOverflow = point.lowYPosition - (topPadding + chartHeight - iconSize/2)
                 point.lowYPosition = topPadding + chartHeight - iconSize/2
                 point.highYPosition -= lowOverflow
+                // Re-check high position
                 point.highYPosition = point.highYPosition.coerceAtLeast(topPadding + iconSize/2)
             }
         }
     }
 
+    // Third pass: ensure text for temperatures doesn't overlap
     points.forEach { point ->
         val highTextBottom = point.highYPosition - iconSize/2 - textHeight
 
+        // If high temp text would overlap with low temp, adjust further
         if (highTextBottom < topPadding) {
             val adjustment = topPadding - highTextBottom
             point.highYPosition += adjustment
@@ -189,6 +211,7 @@ private fun calculateElementRegions(
 ) {
     with(density) {
         points.forEach { point ->
+            // Icon regions
             val halfIconSize = iconSize / 2
             point.highIconRegion = Region(
                 point.xPosition - halfIconSize,
@@ -204,6 +227,7 @@ private fun calculateElementRegions(
                 point.lowYPosition + halfIconSize
             )
 
+            // Temperature text regions
             val highTempText = toFahrenheitAware(point.highTemp, unit).toString() + "°"
             val highTempLayout = textMeasurer.measure(highTempText, style = TextStyle(fontSize = 16.sp))
 
@@ -249,8 +273,9 @@ private fun DrawScope.drawTemperatureLines(
     progress: Float,
     iconSize: Float
 ) {
-    val gapRadius = iconSize / 2 + 4.dp.toPx()
+    val gapRadius = iconSize / 2 + 4.dp.toPx() // Add a small padding for visual gap
 
+    // Draw high temperature line
     for (i in 0 until points.size - 1) {
         drawCenteredLineSegment(
             startPoint = points[i],
@@ -262,6 +287,7 @@ private fun DrawScope.drawTemperatureLines(
         )
     }
 
+    // Draw low temperature line
     for (i in 0 until points.size - 1) {
         drawCenteredLineSegment(
             startPoint = points[i],
@@ -282,28 +308,38 @@ private fun DrawScope.drawCenteredLineSegment(
     progress: Float,
     gapRadius: Float
 ) {
+    // Get the Y position for this temperature type (high or low)
     val startY = if (isHighTemp) startPoint.highYPosition else startPoint.lowYPosition
     val endY = if (isHighTemp) endPoint.highYPosition else endPoint.lowYPosition
 
+    // Calculate horizontal gap only
     val startX = startPoint.xPosition
     val endX = endPoint.xPosition
 
+    // Determine which direction we're drawing (left to right or right to left)
     val goingRight = startX < endX
 
+    // Apply horizontal gaps only
     val adjustedStartX = if (goingRight) startX + gapRadius else startX - gapRadius
     val adjustedEndX = if (goingRight) endX - gapRadius else endX + gapRadius
 
+    // Check if there's enough horizontal space to draw the line
     if ((goingRight && adjustedStartX >= adjustedEndX) ||
         (!goingRight && adjustedStartX <= adjustedEndX)) {
         return
     }
 
+    // Create the path with the correct y positions
     val path = Path().apply {
         moveTo(adjustedStartX, startY)
 
 
+        // Use a cubic bezier curve with horizontal control points
+        // that are positioned to create a smooth line
         val midX = (adjustedStartX + adjustedEndX) / 2
 
+        // Key change: ensure control points maintain exact Y positions
+        // at the connection points with icons
         cubicTo(
             x1 = midX, y1 = startY,
             x2 = midX, y2 = endY,
@@ -311,6 +347,7 @@ private fun DrawScope.drawCenteredLineSegment(
         )
     }
 
+    // Apply animation progress
     val segmentProgress = progress.coerceIn(0f, 1f)
     val animatedPath = Path()
     PathMeasure().apply {
@@ -332,7 +369,7 @@ private fun DrawScope.drawGridLines(
 ) {
     val lineAlpha = 0.3f
     val lineWidth = 1.dp.toPx()
-    val gapBuffer = 3.dp.toPx()
+    val gapBuffer = 3.dp.toPx() // Extra space around elements for cleaner look
 
     points.forEach { point ->
         val obstacles = listOf(
@@ -342,9 +379,11 @@ private fun DrawScope.drawGridLines(
             point.lowTempRegion
         )
 
+        // Sort obstacles by vertical position
         val sortedObstacles = obstacles.sortedBy { it.top }
         var currentY = yTop
 
+        // Draw line segments between obstacles
         for (obstacle in sortedObstacles) {
             if (obstacle.top - gapBuffer > currentY) {
                 drawLine(
@@ -357,6 +396,7 @@ private fun DrawScope.drawGridLines(
             currentY = obstacle.bottom + gapBuffer
         }
 
+        // Draw final segment if needed
         if (yBottom > currentY) {
             drawLine(
                 color = OnSurfaceVariant.copy(alpha = lineAlpha),
@@ -379,6 +419,7 @@ private fun DrawScope.drawLabels(
     val isTodayColor = Color(0xFFFF6F6F)
 
     points.forEach { point ->
+        // Draw high temperature
         val highTempText = toFahrenheitAware(point.highTemp, unit).toString()
         val highTempStyle = TextStyle(
             fontSize = 16.sp,
@@ -393,6 +434,7 @@ private fun DrawScope.drawLabels(
         drawText(highTempLayout, topLeft = Offset(highTempX, highTempY))
         drawText(degreeSymbolLayout, topLeft = Offset(highTempX + highTempLayout.size.width, highTempY))
 
+        // Draw low temperature
         val lowTempText = toFahrenheitAware(point.lowTemp, unit).toString()
         val lowTempStyle = highTempStyle.copy(color = onSurfaceColor)
         val lowTempLayout = textMeasurer.measure(lowTempText, style = lowTempStyle)
@@ -403,6 +445,7 @@ private fun DrawScope.drawLabels(
         drawText(lowTempLayout, topLeft = Offset(lowTempX, lowTempY))
         drawText(lowDegreeLayout, topLeft = Offset(lowTempX + lowTempLayout.size.width, lowTempY))
 
+        // Draw day of week
         var dayOfWeekText = point.date.dayOfWeek.getDisplayName(
             JavaTextStyle.SHORT,
             Locale.forLanguageTag("pl")
@@ -426,6 +469,7 @@ private fun DrawScope.drawLabels(
             drawText(dotLayout, topLeft = Offset(dayX + dayLayout.size.width, dayY))
         }
 
+        // Draw day of month
         val dayOfMonthText = point.date.dayOfMonth.toString()
         val dayOfMonthLayout = textMeasurer.measure(
             dayOfMonthText,

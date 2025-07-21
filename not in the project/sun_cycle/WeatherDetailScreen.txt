@@ -1,3 +1,4 @@
+
 package com.example.modernweather.ui.screens
 
 import androidx.compose.animation.*
@@ -13,6 +14,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -47,14 +49,10 @@ import com.example.modernweather.ui.viewmodel.SettingsUiState
 import com.example.modernweather.ui.viewmodel.WeatherDetailUiState
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
 import kotlinx.coroutines.launch
-import androidx.compose.ui.graphics.lerp
 import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.*
-import kotlin.math.cos
-import kotlin.math.sin
-import kotlin.random.Random
 
 fun toFahrenheit(celsius: Int): Int {
     return (celsius * 9 / 5) + 32
@@ -104,7 +102,6 @@ fun WeatherDetailScreen(
                     data = state.weatherData,
                     settings = settingsState,
                     aiInsight = state.aiInsight,
-                    viewModel = viewModel,
                     onNavigateToRadar = onNavigateToRadar
                 )
             }
@@ -118,7 +115,6 @@ fun WeatherContent(
     data: WeatherData,
     settings: SettingsUiState,
     aiInsight: String,
-    viewModel: WeatherViewModel,
     onNavigateToRadar: () -> Unit
 ) {
     val pagerState = rememberPagerState(pageCount = { 2 })
@@ -147,7 +143,7 @@ fun WeatherContent(
 
         HorizontalPager(state = pagerState) { page ->
             when (page) {
-                0 -> WeatherPage(data = data, unit = settings.temperatureUnit, viewModel = viewModel, onNavigateToRadar = onNavigateToRadar)
+                0 -> WeatherPage(data = data, unit = settings.temperatureUnit, onNavigateToRadar = onNavigateToRadar)
                 1 -> AiInsightPage(insight = aiInsight)
             }
         }
@@ -155,7 +151,7 @@ fun WeatherContent(
 }
 
 @Composable
-fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherViewModel, onNavigateToRadar: () -> Unit) {
+fun WeatherPage(data: WeatherData, unit: TemperatureUnit, onNavigateToRadar: () -> Unit) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -187,7 +183,7 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
             }
         }
         item { RadarCard(onClick = onNavigateToRadar) }
-        item { SunCycleSection(sunInfo = data.sunInfo, viewModel = viewModel) }
+        item { SunCycleSection(sunInfo = data.sunInfo) }
     }
 }
 
@@ -454,31 +450,21 @@ fun RadarCard(onClick: () -> Unit) {
 }
 
 @Composable
-fun SunCycleSection(sunInfo: SunInfo, viewModel: WeatherViewModel) {
-    val now = viewModel.getCurrentTime()
-    val sunrise = sunInfo.sunrise
-    val sunset = sunInfo.sunset
+fun SunCycleSection(sunInfo: SunInfo) {
+    val now = LocalTime.now()
+    val totalDaylightDuration = Duration.between(sunInfo.sunrise, sunInfo.sunset)
+    val totalDaylightMinutes = totalDaylightDuration.toMinutes().toFloat()
 
-    val totalDaylightDuration = Duration.between(sunrise, sunset)
-    val totalNightDuration = Duration.ofHours(24).minus(totalDaylightDuration)
-
-    val isDay = now.isAfter(sunrise) && now.isBefore(sunset)
-
-    val progress = if (isDay) {
-        val elapsedDaytime = Duration.between(sunrise, now)
-        (elapsedDaytime.toMinutes().toFloat() / totalDaylightDuration.toMinutes().toFloat()).coerceIn(0f, 1f)
+    val elapsedMinutes = if (now.isAfter(sunInfo.sunrise) && now.isBefore(sunInfo.sunset)) {
+        Duration.between(sunInfo.sunrise, now).toMinutes().toFloat()
+    } else if (now.isAfter(sunInfo.sunset)) {
+        totalDaylightMinutes
     } else {
-        val elapsedNighttime = if (now.isAfter(sunset)) {
-            Duration.between(sunset, now)
-        } else {
-            val timeUntilMidnight = Duration.between(sunset, LocalTime.MAX)
-            val timeFromMidnight = Duration.between(LocalTime.MIN, now)
-            timeUntilMidnight.plus(timeFromMidnight).plusMinutes(1)
-        }
-        (elapsedNighttime.toMinutes().toFloat() / totalNightDuration.toMinutes().toFloat()).coerceIn(0f, 1f)
+        0f
     }
 
-    val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1500), label = "sun_moon_progress")
+    val progress = (elapsedMinutes / totalDaylightMinutes).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(targetValue = progress, animationSpec = tween(1500), label = "sun_progress")
 
     val daylightHours = totalDaylightDuration.toHours()
     val daylightMinutes = totalDaylightDuration.toMinutes() % 60
@@ -490,7 +476,7 @@ fun SunCycleSection(sunInfo: SunInfo, viewModel: WeatherViewModel) {
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            SunArc(progress = animatedProgress, isDay = isDay)
+            SunArc(progress = animatedProgress)
             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
@@ -500,7 +486,7 @@ fun SunCycleSection(sunInfo: SunInfo, viewModel: WeatherViewModel) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Wschód", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        sunInfo.sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -515,7 +501,7 @@ fun SunCycleSection(sunInfo: SunInfo, viewModel: WeatherViewModel) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Zachód", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
-                        sunset.format(DateTimeFormatter.ofPattern("HH:mm")),
+                        sunInfo.sunset.format(DateTimeFormatter.ofPattern("HH:mm")),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -526,38 +512,25 @@ fun SunCycleSection(sunInfo: SunInfo, viewModel: WeatherViewModel) {
 }
 
 @Composable
-fun SunArc(progress: Float, isDay: Boolean) {
-    val horizonColor = Color(0xFFFF6F00)
-    val middayColor = Color(0xFFFFF59D)
+fun SunArc(progress: Float) {
+    val sunriseColor = Color(0xFFFFC400)
+    val sunsetColor = Color(0xFFFF6F00)
     val arcTrackColor = MaterialTheme.colorScheme.surfaceVariant
     val skyColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
-    val nightSkyColor = Color(0xFF001B3A).copy(alpha = 0.2f)
+    val sunColor = Color.White
+    val sunGlow = sunriseColor.copy(alpha = 0.5f)
 
-    val starPositions = remember {
-        List(100) {
-            Offset(
-                x = (Random.nextFloat() - 0.5f) * 2,
-                y = Random.nextFloat()
-            )
-        }
-    }
-
-    Canvas(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(120.dp)
-    ) {
+    Canvas(modifier = Modifier
+        .fillMaxWidth()
+        .height(130.dp)
+        .padding(horizontal = 16.dp)) {
         val canvasWidth = size.width
         val canvasHeight = size.height
-
-        val maxRadiusFromWidth = canvasWidth / 2f
-        val maxRadiusFromHeight = canvasHeight * 0.95f
-        val arcRadius = minOf(maxRadiusFromWidth, maxRadiusFromHeight)
-
-        val arcCenter = Offset(x = canvasWidth / 2f, y = canvasHeight)
+        val arcRadius = canvasWidth / 2f
+        val arcCenter = Offset(x = canvasWidth / 2f, y = canvasHeight * 0.9f)
         val arcSize = Size(width = arcRadius * 2, height = arcRadius * 2)
         val arcTopLeft = Offset(arcCenter.x - arcRadius, arcCenter.y - arcRadius)
-        val horizonY = canvasHeight
+        val horizonY = arcCenter.y
 
         drawLine(
             color = arcTrackColor,
@@ -565,25 +538,6 @@ fun SunArc(progress: Float, isDay: Boolean) {
             end = Offset(canvasWidth, horizonY),
             strokeWidth = 3f
         )
-
-        val skyPath = Path().apply {
-            moveTo(arcCenter.x - arcRadius, horizonY)
-            arcTo(
-                rect = Rect(arcTopLeft, arcSize),
-                startAngleDegrees = 180f,
-                sweepAngleDegrees = 180f,
-                forceMoveTo = false
-            )
-            lineTo(arcCenter.x + arcRadius, horizonY)
-            close()
-        }
-
-        val skyBrush = Brush.verticalGradient(
-            colors = listOf(if (isDay) skyColor else nightSkyColor, Color.Transparent),
-            startY = arcCenter.y - arcRadius,
-            endY = horizonY
-        )
-        drawPath(path = skyPath, brush = skyBrush)
 
         drawArc(
             color = arcTrackColor,
@@ -595,123 +549,87 @@ fun SunArc(progress: Float, isDay: Boolean) {
             style = Stroke(width = 6f)
         )
 
-        if (!isDay) {
-            starPositions.forEach { star ->
-                val starX = arcCenter.x + star.x * arcRadius * 0.95f
-                val starY = horizonY - star.y * arcRadius * 0.9f
-                if ((starX - arcCenter.x).let { it * it } + (starY - arcCenter.y).let { it * it } < arcRadius * arcRadius && starY < horizonY) {
-                    drawCircle(
-                        color = Color.White.copy(alpha = Random.nextFloat() * 0.8f + 0.2f),
-                        radius = (Random.nextFloat() * 1.5f + 0.5f),
-                        center = Offset(starX, starY)
-                    )
-                }
-            }
+        val arcGradient = Brush.linearGradient(
+            colors = listOf(sunriseColor, sunsetColor),
+            start = Offset(0f, horizonY),
+            end = Offset(canvasWidth, horizonY)
+        )
+        if (progress > 0f) {
+            drawArc(
+                brush = arcGradient,
+                startAngle = 180f,
+                sweepAngle = 180 * progress,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = Stroke(width = 6f)
+            )
         }
+
+        val skyPath = Path().apply {
+            moveTo(0f, horizonY)
+            addArc(
+                oval = Rect(
+                    left = arcTopLeft.x,
+                    top = arcTopLeft.y,
+                    right = arcTopLeft.x + arcSize.width,
+                    bottom = arcTopLeft.y + arcSize.height
+                ),
+                startAngleDegrees = 180f,
+                sweepAngleDegrees = 180f
+            )
+            lineTo(canvasWidth, horizonY)
+            close()
+        }
+        drawPath(
+            path = skyPath,
+            brush = Brush.verticalGradient(
+                colors = listOf(skyColor, Color.Transparent),
+                startY = arcCenter.y - arcRadius,
+                endY = horizonY
+            )
+        )
 
         val angleRad = Math.toRadians((180 * progress) + 180.0).toFloat()
-        val objectX = arcCenter.x + cos(angleRad) * arcRadius
-        val objectY = arcCenter.y + sin(angleRad) * arcRadius
-        val objectPosition = Offset(objectX, objectY)
+        val sunX = arcCenter.x + arcRadius * kotlin.math.cos(angleRad)
+        val sunY = arcCenter.y + arcRadius * kotlin.math.sin(angleRad)
+        val sunPosition = Offset(sunX, sunY)
 
-        if (isDay) {
-            val arcGradient = Brush.linearGradient(
-                colors = listOf(horizonColor, middayColor),
-                start = Offset(arcCenter.x - arcRadius, horizonY),
-                end = Offset(arcCenter.x, arcCenter.y - arcRadius)
-            )
-            if (progress > 0f) {
-                drawArc(
-                    brush = arcGradient,
-                    startAngle = 180f,
-                    sweepAngle = 180 * progress,
-                    useCenter = false,
-                    topLeft = arcTopLeft,
-                    size = arcSize,
-                    style = Stroke(width = 6f)
-                )
-            }
-
-            val sunColorFactor = if (progress < 0.5f) progress * 2 else (1.0f - progress) * 2
-            val sunColor = lerp(horizonColor, middayColor, sunColorFactor)
-            val sunGlow = sunColor.copy(alpha = 0.5f)
-
-            drawCircle(
-                brush = Brush.radialGradient(colors = listOf(sunGlow, Color.Transparent), center = objectPosition, radius = 22.dp.toPx()),
-                radius = 22.dp.toPx(),
-                center = objectPosition
-            )
-            drawCircle(color = sunColor, radius = 11.dp.toPx(), center = objectPosition)
-        } else {
-            val moonColor = Color(0xFFE0E0E0)
-            val moonGlow = Color.White.copy(alpha = 0.4f)
-            drawCircle(
-                brush = Brush.radialGradient(colors = listOf(moonGlow, Color.Transparent), center = objectPosition, radius = 20.dp.toPx()),
-                radius = 20.dp.toPx(),
-                center = objectPosition
-            )
-            drawCircle(color = moonColor, radius = 11.dp.toPx(), center = objectPosition)
-        }
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(sunGlow, Color.Transparent),
+                center = sunPosition,
+                radius = 32.dp.toPx()
+            ),
+            radius = 32.dp.toPx(),
+            center = sunPosition
+        )
+        drawCircle(
+            color = sunColor,
+            radius = 12.dp.toPx(),
+            center = sunPosition
+        )
+        drawCircle(
+            color = sunsetColor,
+            radius = 6.dp.toPx(),
+            center = sunPosition
+        )
     }
 }
 
 @Composable
 fun AlertCard(alert: WeatherAlert) {
-    val (backgroundColor, contentColor, icon) = when (alert.severity) {
-        AlertSeverity.INFO -> Triple(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.onPrimaryContainer,
-            Icons.Default.Info
-        )
-        AlertSeverity.WARNING -> Triple(
-            Color(0xFFFFF3E0),
-            Color(0xFFE65100),
-            Icons.Default.Warning
-        )
-        AlertSeverity.SEVERE -> Triple(
-            Color(0xFFFFEBEE),
-            Color(0xFFD32F2F),
-            Icons.Default.Dangerous
-        )
+    val backgroundColor = when (alert.severity) {
+        AlertSeverity.INFO -> Primary.copy(alpha = 0.3f)
+        AlertSeverity.WARNING -> AlertWarning
+        AlertSeverity.SEVERE -> AlertSevere
     }
+    val contentColor = if (alert.severity == AlertSeverity.SEVERE) Color.White else MaterialTheme.colorScheme.onSurface
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(24.dp)
-            )
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = alert.title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = contentColor,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = alert.description,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor.copy(alpha = 0.8f)
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Ważne do: ${alert.expirationTime}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor.copy(alpha = 0.7f)
-                )
-            }
+    TitledCard(title = alert.title.uppercase()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(alert.description, fontSize = 14.sp, color = contentColor)
+            Text(alert.expirationTime, fontSize = 12.sp, color = contentColor.copy(alpha = 0.8f))
         }
     }
 }

@@ -1,0 +1,148 @@
+@Composable
+fun SunCycleSection(sunInfo: SunInfo) {
+    val now = LocalTime.now()
+    val totalDaylightMinutes = Duration.between(sunInfo.sunrise, sunInfo.sunset).toMinutes().toFloat()
+    val elapsedMinutes = if (now.isAfter(sunInfo.sunrise) && now.isBefore(sunInfo.sunset)) {
+        Duration.between(sunInfo.sunrise, now).toMinutes().toFloat()
+    } else if (now.isAfter(sunInfo.sunset)) {
+        totalDaylightMinutes
+    } else {
+        0f
+    }
+
+    val progress = (elapsedMinutes / totalDaylightMinutes).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(1500),
+        label = "sun_progress"
+    )
+
+    TitledCard(title = "WSCHÓD I ZACHÓD SŁOŃCA") {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(MaterialTheme.colorScheme.surface, MaterialTheme.colorScheme.surfaceVariant)
+                    ),
+                    shape = MaterialTheme.shapes.medium
+                )
+                .padding(16.dp)
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                SunArc(progress = animatedProgress)
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WbSunny,
+                            contentDescription = "Wschód",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Wschód: ${sunInfo.sunrise.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.WbTwilight,
+                            contentDescription = "Zachód",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "Zachód: ${sunInfo.sunset.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SunArc(progress: Float) {
+    val sunColor = MaterialTheme.colorScheme.primary
+    val backgroundArcBrush = Brush.linearGradient(
+        colors = listOf(Color.LightGray.copy(alpha = 0.5f), Color.Gray.copy(alpha = 0.5f)),
+        start = Offset.Zero,
+        end = Offset.Infinite
+    )
+    val progressArcBrush = Brush.linearGradient(
+        colors = listOf(sunColor.copy(alpha = 0.7f), sunColor),
+        start = Offset.Zero,
+        end = Offset.Infinite
+    )
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+    ) {
+        val stroke = Stroke(width = 8f, cap = StrokeCap.Round)
+
+        val arcSize = Size(width = size.width * 0.7f, height = size.width * 0.7f)
+        val arcTopLeft = Offset(x = (size.width - arcSize.width) / 2f, y = size.height * 0.3f)
+
+        // Rysowanie tła łuku (cały okres dnia)
+        drawArc(
+            brush = backgroundArcBrush,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = stroke
+        )
+
+        // Rysowanie łuku postępu (od wschodu do aktualnej pozycji)
+        drawArc(
+            brush = progressArcBrush,
+            startAngle = 180f,
+            sweepAngle = 180f * progress,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = stroke
+        )
+
+        // Obliczanie pozycji słońca
+        val angle = (180 * progress) + 180
+        val angleRad = Math.toRadians(angle.toDouble()).toFloat()
+        val radius = arcSize.width / 2f
+        val sunX = center.x + radius * kotlin.math.cos(angleRad)
+        val sunY = (arcTopLeft.y + radius) + radius * kotlin.math.sin(angleRad)
+
+        // Rysowanie poświaty słońca
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(sunColor.copy(alpha = 0.5f), Color.Transparent),
+                radius = 32f
+            ),
+            radius = 32f,
+            center = Offset(sunX, sunY)
+        )
+
+        // Rysowanie słońca
+        drawCircle(
+            color = sunColor,
+            radius = 16f,
+            center = Offset(sunX, sunY)
+        )
+    }
+}

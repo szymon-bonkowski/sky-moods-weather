@@ -1,6 +1,5 @@
 package com.example.modernweather.ui.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.animation.core.tween
@@ -9,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -30,13 +30,18 @@ fun AqiGauge(
     size: Dp = 120.dp,
     verticalOffset: Dp = 10.dp
 ) {
-    var animationPlayed by remember { mutableStateOf(false) }
+    var animationPlayed by rememberSaveable {
+        mutableStateOf(false)
+    }
+
     val maxAqi = 300f
     val targetSweepAngle = (240f * (aqi / maxAqi)).coerceIn(0f, 240f)
     val animationDuration = 1500
 
     LaunchedEffect(Unit) {
-        animationPlayed = true
+        if (!animationPlayed) {
+            animationPlayed = true
+        }
     }
 
     val sweepAngle by animateFloatAsState(
@@ -53,6 +58,7 @@ fun AqiGauge(
 
     val currentAnimatedAqiValue = (sweepAngle / 240f) * maxAqi
     val gaugeColor = getAqiColor(aqiValue = currentAnimatedAqiValue)
+
     val aqiText = when {
         currentAnimatedAqiValue <= 50 -> "Dobra"
         currentAnimatedAqiValue <= 100 -> "Umiarkowana"

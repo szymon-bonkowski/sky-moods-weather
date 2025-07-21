@@ -1,0 +1,105 @@
+// Finalna wersja kodu
+var ctx = document.getElementById('sunriseSunsetChart').getContext('2d');
+var dates = ['2023-01-01', '2023-01-02', '2023-01-03'];
+var sunriseTimes = [7, 7.1, 7.2];
+var sunsetTimes = [16, 16.1, 16.2];
+
+var chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: dates,
+        datasets: [
+            {
+                label: 'Wschód słońca',
+                data: sunriseTimes,
+                borderColor: '#FFD700',
+                backgroundColor: 'rgba(255, 215, 0, 0.2)',
+                borderWidth: 2,
+                fill: false
+            },
+            {
+                label: 'Zachód słońca',
+                data: sunsetTimes,
+                borderColor: '#8A2BE2',
+                backgroundColor: 'rgba(138, 43, 226, 0.2)',
+                borderWidth: 2,
+                fill: false
+            }
+        ]
+    },
+    options: {
+        scales: {
+            yAxes: [{
+                ticks: {
+                    beginAtZero: true,
+                    callback: function(value) {
+                        var hours = Math.floor(value);
+                        var minutes = Math.round((value - hours) * 60);
+                        if (minutes < 10) minutes = '0' + minutes;
+                        return hours + ':' + minutes;
+                    },
+                    min: 0,
+                    max: 24,
+                    stepSize: 1
+                },
+                scaleLabel: {
+                    display: true,
+                    labelString: 'Godzina',
+                    fontSize: 14,
+                    fontColor: '#666'
+                }
+            }],
+            xAxes: [{
+                scaleLabel: {
+                    display: true,
+                    labelString: 'Data',
+                    fontSize: 14,
+                    fontColor: '#666'
+                }
+            }]
+        },
+        title: {
+            display: true,
+            text: 'Godziny wschodu i zachodu słońca',
+            fontSize: 18,
+            fontColor: '#333'
+        },
+        legend: {
+            display: true,
+            position: 'top',
+            labels: {
+                fontSize: 12,
+                fontColor: '#333'
+            }
+        },
+        tooltips: {
+            callbacks: {
+                label: function(tooltipItem, data) {
+                    var dataset = data.datasets[tooltipItem.datasetIndex];
+                    var value = dataset.data[tooltipItem.index];
+                    var hours = Math.floor(value);
+                    var minutes = Math.round((value - hours) * 60);
+                    if (minutes < 10) minutes = '0' + minutes;
+                    return dataset.label + ': ' + hours + ':' + minutes;
+                }
+            },
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            titleFontSize: 14,
+            bodyFontSize: 12,
+            titleFontColor: '#fff',
+            bodyFontColor: '#fff',
+            cornerRadius: 4,
+            xPadding: 10,
+            yPadding: 10
+        },
+        elements: {
+            line: {
+                tension: 0.4
+            }
+        },
+        animation: {
+            duration: 1000,
+            easing: 'easeOutQuart'
+        }
+    }
+});

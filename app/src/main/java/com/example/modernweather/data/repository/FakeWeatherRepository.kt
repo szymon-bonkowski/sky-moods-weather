@@ -10,6 +10,27 @@ import kotlin.random.Random
 
 class FakeWeatherRepository : WeatherRepository {
 
+    // Czas "rzeczywisty" oraz czas wschodu i zachodu słońca
+    var testTime: LocalTime? = LocalTime.of(15, 21)
+    var testSunrise: LocalTime? = LocalTime.of(5, 0)
+    var testSunset: LocalTime? = LocalTime.of(22, 31)
+
+    private fun getCurrentTime(): LocalTime {
+        return testTime ?: LocalTime.now()
+    }
+
+    fun setTestValues(currentTime: LocalTime, sunrise: LocalTime, sunset: LocalTime) {
+        testTime = currentTime
+        testSunrise = sunrise
+        testSunset = sunset
+    }
+
+    fun resetToRealTime() {
+        testTime = null
+        testSunrise = null
+        testSunset = null
+    }
+
     private val fakeLocations = listOf(
         Location(id = "warszawa", name = "Warszawa", isCurrentLocation = true),
         Location(id = "krakow", name = "Kraków"),
@@ -28,7 +49,7 @@ class FakeWeatherRepository : WeatherRepository {
     }
 
     private fun generateFakeDataFor(location: Location): WeatherData {
-        val now = LocalTime.now()
+        val now = getCurrentTime()
         val today = LocalDate.now()
 
         return WeatherData(
@@ -60,6 +81,7 @@ class FakeWeatherRepository : WeatherRepository {
                     },
                     conditionEnum = when (hour) {
                         in 0..2 -> WeatherCondition.NIGHT_RAIN_LIGHT
+                        in 3..6 -> WeatherCondition.DAY_CLOUDY
                         in 7..16 -> WeatherCondition.DAY_SUNNY
                         in 17..20 -> WeatherCondition.DAY_PARTLY_CLOUDY
                         else -> WeatherCondition.DAY_CLOUDY
@@ -90,8 +112,8 @@ class FakeWeatherRepository : WeatherRepository {
                 airQualityIndex = 41
             ),
             sunInfo = SunInfo(
-                sunrise = LocalTime.of(4, 20),
-                sunset = LocalTime.of(20, 47)
+                sunrise = testSunrise ?: LocalTime.of(4, 20),
+                sunset = testSunset ?: LocalTime.of(20, 47)
             )
         )
     }

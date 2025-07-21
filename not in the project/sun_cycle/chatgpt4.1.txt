@@ -1,0 +1,128 @@
+@Composable
+fun SunCycleSection(sunInfo: SunInfo) {
+    val now = LocalTime.now()
+    val totalDaylightMinutes = Duration.between(sunInfo.sunrise, sunInfo.sunset).toMinutes().toFloat()
+    val elapsedMinutes = if (now.isAfter(sunInfo.sunrise) && now.isBefore(sunInfo.sunset)) {
+        Duration.between(sunInfo.sunrise, now).toMinutes().toFloat()
+    } else if (now.isAfter(sunInfo.sunset)) {
+        totalDaylightMinutes
+    } else {
+        0f
+    }
+    val progress = (elapsedMinutes / totalDaylightMinutes).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(1500),
+        label = "sun_progress"
+    )
+
+    TitledCard(
+        title = "WSCHÓD I ZACHÓD SŁOŃCA",
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(170.dp)
+            .clip(RoundedCornerShape(22.dp)) // Większe zaokrąglenie
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+        ) {
+            SunArc(
+                progress = animatedProgress,
+                sunrise = sunInfo.sunrise,
+                sunset = sunInfo.sunset
+            )
+        }
+    }
+}
+
+@Composable
+fun SunArc(progress: Float, sunrise: LocalTime, sunset: LocalTime) {
+    val arcColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+    val sunColor = AccentYellow // np. Color(0xFFFFD600)
+    val arcGlow = sunColor.copy(alpha = 0.14f)
+
+    val sunPulse by infiniteTransition.animateFloat(
+        initialValue = 1f, targetValue = 1.15f, animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = EaseInOutCubic), repeatMode = RepeatMode.Reverse
+        ), label = "sun_pulse"
+    )
+
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+            .padding(horizontal = 12.dp)
+    ) {
+        val arcStroke = Stroke(width = 6f, cap = StrokeCap.Round)
+        val arcRadius = size.width * 0.38f
+        val arcCenter = Offset(size.width / 2, size.height * 0.95f)
+
+        // Łuk (mocniejszy, z lekkim cieniem)
+        drawArc(
+            color = arcColor,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(arcCenter.x - arcRadius, arcCenter.y - arcRadius),
+            size = Size(arcRadius * 2, arcRadius * 2),
+            style = arcStroke
+        )
+        // Glow pod łukiem
+        drawArc(
+            color = arcGlow,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(arcCenter.x - arcRadius, arcCenter.y - arcRadius),
+            size = Size(arcRadius * 2, arcRadius * 2),
+            style = Stroke(width = 18f)
+        )
+
+        // Pozycja Słońca
+        val angle = 180f + 180f * progress
+        val rad = Math.toRadians(angle.toDouble())
+        val sunX = arcCenter.x + arcRadius * kotlin.math.cos(rad).toFloat()
+        val sunY = arcCenter.y + arcRadius * kotlin.math.sin(rad).toFloat()
+
+        // Glow Słońca
+        drawCircle(
+            brush = Brush.radialGradient(
+                listOf(sunColor.copy(alpha = 0.25f * sunPulse), Color.Transparent)
+            ),
+            radius = 28f * sunPulse,
+            center = Offset(sunX, sunY)
+        )
+        // Słońce (pełne, żółte)
+        drawCircle(
+            color = sunColor,
+            radius = 14f * sunPulse,
+            center = Offset(sunX, sunY)
+        )
+
+        // Podpisy godzin (większa czytelność)
+        drawContext.canvas.nativeCanvas.apply {
+            val paint = android.graphics.Paint().apply {
+                color = android.graphics.Color.WHITE
+                textSize = 30f
+                isAntiAlias = true
+                alpha = 230
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+            }
+            drawText(
+                "Wschód: ${sunrise.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                arcCenter.x - arcRadius,
+                arcCenter.y + 36.dp.toPx(),
+                paint
+            )
+            drawText(
+                "Zachód: ${sunset.format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                arcCenter.x + arcRadius - 160.dp.toPx(),
+                arcCenter.y + 36.dp.toPx(),
+                paint
+            )
+        }
+    }
+}

@@ -1,0 +1,223 @@
+@Composable
+fun SunCycleSection(sunInfo: SunInfo) {
+    val now = LocalTime.now()
+    val totalDaylightMinutes = Duration.between(sunInfo.sunrise, sunInfo.sunset).toMinutes().toFloat()
+    val elapsedMinutes = if (now.isAfter(sunInfo.sunrise) && now.isBefore(sunInfo.sunset)) {
+        Duration.between(sunInfo.sunrise, now).toMinutes().toFloat()
+    } else if (now.isAfter(sunInfo.sunset)) {
+        totalDaylightMinutes
+    } else {
+        0f
+    }
+
+    val progress = (elapsedMinutes / totalDaylightMinutes).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress, 
+        animationSpec = tween(1500), 
+        label = "sun_progress"
+    )
+
+    TitledCard(title = "WSCHÓD I ZACHÓD SŁOŃCA") {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            SunArc(progress = animatedProgress, currentTime = now, sunInfo = sunInfo)
+            Spacer(Modifier.height(20.dp))
+            Row(
+                Modifier.fillMaxWidth(), 
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SunTimeInfo(
+                    label = "Wschód",
+                    time = sunInfo.sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
+                    icon = Icons.Default.WbSunny
+                )
+                SunTimeInfo(
+                    label = "Zachód", 
+                    time = sunInfo.sunset.format(DateTimeFormatter.ofPattern("HH:mm")),
+                    icon = Icons.Default.WbTwilight
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SunTimeInfo(label: String, time: String, icon: ImageVector) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color(0xFFFFB74D), // Warm sun color
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = time,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}
+
+@Composable
+fun SunArc(progress: Float, currentTime: LocalTime, sunInfo: SunInfo) {
+    val sunColor = Color(0xFFFFB74D) // Warm golden sun color
+    val dayArcColor = Color(0xFF4FC3F7) // Sky blue for day
+    val nightArcColor = Color(0xFF5C6BC0) // Purple-ish for night
+    val trackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.2f)
+    
+    val isDaytime = currentTime.isAfter(sunInfo.sunrise) && currentTime.isBefore(sunInfo.sunset)
+
+    Canvas(modifier = Modifier
+        .fillMaxWidth()
+        .height(160.dp)) {
+        
+        val arcStroke = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+        val trackStroke = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round)
+        
+        val arcSize = Size(width = size.width * 0.85f, height = size.width * 0.85f)
+        val arcTopLeft = Offset(
+            x = (size.width - arcSize.width) / 2f, 
+            y = size.height * 0.15f
+        )
+        
+        // Draw background track
+        drawArc(
+            color = trackColor,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = arcTopLeft,
+            size = arcSize,
+            style = trackStroke
+        )
+        
+        // Draw progress arc with gradient
+        val progressSweep = 180f * progress
+        if (progressSweep > 0) {
+            drawArc(
+                brush = Brush.sweepGradient(
+                    colors = listOf(
+                        dayArcColor.copy(alpha = 0.8f),
+                        sunColor.copy(alpha = 0.9f),
+                        nightArcColor.copy(alpha = 0.8f)
+                    ),
+                    center = Offset(center.x, arcTopLeft.y + arcSize.height / 2f)
+                ),
+                startAngle = 180f,
+                sweepAngle = progressSweep,
+                useCenter = false,
+                topLeft = arcTopLeft,
+                size = arcSize,
+                style = arcStroke
+            )
+        }
+        
+        // Calculate sun position
+        val angle = (180 * progress) + 180
+        val angleRad = Math.toRadians(angle.toDouble()).toFloat()
+        val radius = arcSize.width / 2f
+        val sunX = center.x + radius * kotlin.math.cos(angleRad)
+        val sunY = (arcTopLeft.y + radius) + radius * kotlin.math.sin(angleRad)
+        
+        // Draw sun glow
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    sunColor.copy(alpha = 0.4f),
+                    sunColor.copy(alpha = 0.2f),
+                    Color.Transparent
+                ),
+                radius = 32.dp.toPx()
+            ),
+            radius = 32.dp.toPx(),
+            center = Offset(sunX, sunY)
+        )
+        
+        // Draw sun
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(
+                    Color(0xFFFFF176), // Bright center
+                    sunColor,
+                    Color(0xFFFF8F00) // Orange edge
+                )
+            ),
+            radius = 14.dp.toPx(),
+            center = Offset(sunX, sunY)
+        )
+        
+        // Draw horizon line
+        val horizonY = arcTopLeft.y + radius
+        drawLine(
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f),
+            start = Offset(arcTopLeft.x, horizonY),
+            end = Offset(arcTopLeft.x + arcSize.width, horizonY),
+            strokeWidth = 2.dp.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10.dp.toPx(), 5.dp.toPx()), 0f)
+        )
+        
+        // Add current time indicator if during daylight
+        if (isDaytime && progress > 0 && progress < 1) {
+            val timeAngle = (180 * progress) + 180
+            val timeAngleRad = Math.toRadians(timeAngle.toDouble()).toFloat()
+            val timeRadius = arcSize.width / 2f - 16.dp.toPx()
+            val timeX = center.x + timeRadius * kotlin.math.cos(timeAngleRad)
+            val timeY = (arcTopLeft.y + radius) + timeRadius * kotlin.math.sin(timeAngleRad)
+            
+            drawCircle(
+                color = MaterialTheme.colorScheme.primary,
+                radius = 4.dp.toPx(),
+                center = Offset(timeX, timeY)
+            )
+        }
+        
+        // Add day/night labels
+        val labelY = horizonY + 24.dp.toPx()
+        
+        // Night label (left)
+        drawContext.canvas.nativeCanvas.drawText(
+            "Noc",
+            arcTopLeft.x + 20.dp.toPx(),
+            labelY,
+            android.graphics.Paint().apply {
+                color = nightArcColor.toArgb()
+                textSize = 12.sp.toPx()
+                isAntiAlias = true
+            }
+        )
+        
+        // Day label (center)
+        drawContext.canvas.nativeCanvas.drawText(
+            "Dzień",
+            center.x - 15.dp.toPx(),
+            labelY,
+            android.graphics.Paint().apply {
+                color = dayArcColor.toArgb()
+                textSize = 12.sp.toPx()
+                isAntiAlias = true
+            }
+        )
+        
+        // Night label (right)
+        drawContext.canvas.nativeCanvas.drawText(
+            "Noc",
+            arcTopLeft.x + arcSize.width - 40.dp.toPx(),
+            labelY,
+            android.graphics.Paint().apply {
+                color = nightArcColor.toArgb()
+                textSize = 12.sp.toPx()
+                isAntiAlias = true
+            }
+        )
+    }
+}

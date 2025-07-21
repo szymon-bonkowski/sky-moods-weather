@@ -1,0 +1,106 @@
+@Composable
+fun SunCycleSection(sunInfo: SunInfo) {
+    val now = LocalTime.now()
+    val totalDaylightMinutes = Duration.between(sunInfo.sunrise, sunInfo.sunset).toMinutes().toFloat()
+    val elapsedMinutes = if (now.isAfter(sunInfo.sunrise) && now.isBefore(sunInfo.sunset)) {
+        Duration.between(sunInfo.sunrise, now).toMinutes().toFloat()
+    } else if (now.isAfter(sunInfo.sunset)) {
+        totalDaylightMinutes
+    } else {
+        0f
+    }
+    val progress by animateFloatAsState(
+        targetValue = (elapsedMinutes / totalDaylightMinutes).coerceIn(0f, 1f),
+        animationSpec = tween(durationMillis = 1500),
+        label = "sunProgress"
+    )
+
+    TitledCard(title = "WSCHÓD I ZACHÓD SŁOŃCA") {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            SunArc(
+                progress = progress,
+                sunrise = sunInfo.sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
+                sunset = sunInfo.sunset.format(DateTimeFormatter.ofPattern("HH:mm"))
+            )
+        }
+    }
+}
+
+@Composable
+fun SunArc(
+    progress: Float,
+    sunrise: String,
+    sunset: String
+) {
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+    val indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f)
+    
+    Box(modifier = Modifier.size(180.dp)) {
+        // Tło łuku
+        Canvas(modifier = Modifier.matchParentSize()) {
+            val center = Offset(size.width / 2, size.height / 2)
+            val radius = min(size.width, size.height) / 2 - 16.dp.toPx()
+            
+            // Pełny łuk (nieaktywny)
+            drawArc(
+                brush = Brush.sweepGradient(listOf(surfaceColor, surfaceColor)),
+                startAngle = 135f,
+                sweepAngle = 90f,
+                useCenter = false,
+                center = center,
+                radius = radius,
+                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+            )
+            
+            // Aktywny segment
+            drawArc(
+                brush = Brush.sweepGradient(listOf(primaryColor, indicatorColor)),
+                startAngle = 135f,
+                sweepAngle = 90f * progress,
+                useCenter = false,
+                center = center,
+                radius = radius,
+                style = Stroke(width = 8.dp.toPx(), cap = StrokeCap.Round)
+            )
+        }
+        
+        // Ikona słońca
+        val angle = 135f + 90f * progress
+        val rotation = (-angle + 270f).coerceIn(0f, 360f)
+        Image(
+            painter = painterResource(id = R.drawable.ic_sun),
+            contentDescription = "Sun icon",
+            modifier = Modifier
+                .size(32.dp)
+                .offset {
+                    val offset = calculateOffset(angle, 64.dp)
+                    IntOffset(offset.x.roundToInt(), offset.y.roundToInt())
+                }
+                .rotate(rotation)
+                .align(Alignment.Center)
+        )
+        
+        // Etykiety
+        Text(
+            text = "Wschód: $sunrise",
+            modifier = Modifier.align(Alignment.BottomStart),
+            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+        )
+        Text(
+            text = "Zachód: $sunset",
+            modifier = Modifier.align(Alignment.BottomEnd),
+            style = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+        )
+    }
+}
+
+private fun calculateOffset(angleDegrees: Float, radius: Dp): Offset {
+    val radians = Math.toRadians(angleDegrees.toDouble())
+    val x = radius.toPx() * cos(radians)
+    val y = radius.toPx() * sin(radians)
+    return Offset(x, y)
+}
