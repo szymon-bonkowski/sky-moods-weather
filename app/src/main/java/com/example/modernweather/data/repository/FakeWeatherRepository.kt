@@ -10,8 +10,7 @@ import kotlin.random.Random
 
 class FakeWeatherRepository : WeatherRepository {
 
-    // Czas "rzeczywisty" oraz czas wschodu i zachodu słońca
-    var testTime: LocalTime? = LocalTime.of(15, 21)
+    var testTime: LocalTime? = LocalTime.of(22, 15)
     var testSunrise: LocalTime? = LocalTime.of(5, 0)
     var testSunset: LocalTime? = LocalTime.of(22, 31)
 
@@ -45,7 +44,12 @@ class FakeWeatherRepository : WeatherRepository {
     override fun getWeatherData(locationId: String): Flow<WeatherData> = flow {
         delay(1500)
         val location = fakeLocations.first { it.id == locationId }
-        emit(generateFakeDataFor(location))
+
+        while (true) {
+            emit(generateFakeDataFor(location))
+            delay(1000L)
+            testTime = (testTime ?: LocalTime.now()).plusMinutes(1)
+        }
     }
 
     private fun generateFakeDataFor(location: Location): WeatherData {
