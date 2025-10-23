@@ -74,10 +74,18 @@ fun WeeklyForecastChart(
     val density = LocalDensity.current
     val animationProgress = remember { Animatable(0f) }
 
-    val dayPainters = dailyForecasts.map { painterResource(id = mapConditionToPng(it.conditionEnum, true)) }
-    val nightPainters = dailyForecasts.map { painterResource(id = mapConditionToPng(it.conditionEnum, false)) }
+    val dayPainters = dailyForecasts.map {
+        painterResource(id = mapConditionToPng(it.conditionEnum, true))
+    }
+    val nightPainters = dailyForecasts.map {
+        painterResource(id = mapConditionToPng(it.conditionEnum, false))
+    }
 
-    LaunchedEffect(dailyForecasts) {
+    val forecastKey = remember(dailyForecasts.size, dailyForecasts.firstOrNull()?.date) {
+        "${dailyForecasts.size}_${dailyForecasts.firstOrNull()?.date}"
+    }
+
+    LaunchedEffect(forecastKey) {
         animationProgress.snapTo(0f)
         animationProgress.animateTo(1f, animationSpec = tween(durationMillis = 1500))
     }
@@ -300,7 +308,6 @@ private fun DrawScope.drawCenteredLineSegment(
 
     val path = Path().apply {
         moveTo(adjustedStartX, startY)
-
 
         val midX = (adjustedStartX + adjustedEndX) / 2
 

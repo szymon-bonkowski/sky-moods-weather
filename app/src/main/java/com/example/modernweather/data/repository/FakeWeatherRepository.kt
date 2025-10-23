@@ -47,7 +47,7 @@ class FakeWeatherRepository : WeatherRepository {
 
         while (true) {
             emit(generateFakeDataFor(location))
-            delay(1000L)
+            delay(60_000L)
             testTime = (testTime ?: LocalTime.now()).plusMinutes(1)
         }
     }
