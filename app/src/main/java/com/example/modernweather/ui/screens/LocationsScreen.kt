@@ -66,7 +66,7 @@ fun LocationsScreen(
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
-                        item {
+                        item(key = "header") {
                             Text(
                                 "ZAPISANE LOKALIZACJE",
                                 style = MaterialTheme.typography.labelSmall,
@@ -74,7 +74,10 @@ fun LocationsScreen(
                                 modifier = Modifier.padding(bottom = 8.dp, top = 16.dp)
                             )
                         }
-                        items(uiState.locations) { location ->
+                        items(
+                            items = uiState.locations,
+                            key = { location -> location.id }
+                        ) { location ->
                             LocationItem(location = location, onClick = { onLocationClick(location.id) })
                         }
                     }
@@ -86,7 +89,6 @@ fun LocationsScreen(
 
 @Composable
 private fun SearchBar() {
-
     OutlinedTextField(
         value = "",
         onValueChange = {},

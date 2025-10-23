@@ -106,9 +106,7 @@ class WeatherViewModel(application: Application) : ViewModel() {
     }
 
     fun getCurrentTime(): java.time.LocalTime {
-        return (weatherRepository as? FakeWeatherRepository)?.let { repo ->
-            repo.testTime ?: java.time.LocalTime.now()
-        } ?: java.time.LocalTime.now()
+        return java.time.LocalTime.now()
     }
 
     private fun generateAiInsight(data: WeatherData): String {
