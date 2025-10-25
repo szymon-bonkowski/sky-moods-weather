@@ -94,7 +94,7 @@ class FakeWeatherRepository : WeatherRepository {
                 )
             },
             dailyForecast = listOf(
-                DailyForecast(today.plusDays(0), 26, 14, WeatherCondition.DAY_SUNNY, 10),
+                DailyForecast(today.plusDays(0), 22, 9, WeatherCondition.DAY_SUNNY, 10),
                 DailyForecast(today.plusDays(1), 24, 13, WeatherCondition.DAY_RAIN_LIGHT, 90),
                 DailyForecast(today.plusDays(2), 23, 15, WeatherCondition.DAY_THUNDERSTORM, 50),
                 DailyForecast(today.plusDays(3), 22, 16, WeatherCondition.DAY_SNOW, 35),
