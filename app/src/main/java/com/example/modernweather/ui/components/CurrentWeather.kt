@@ -44,6 +44,7 @@ import kotlin.random.Random
 @Composable
 fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>, unit: TemperatureUnit) {
     val displayTemp = if (unit == TemperatureUnit.CELSIUS) current.temperature else toFahrenheit(current.temperature)
+    val textMeasurer = rememberTextMeasurer()
 
     Box(
         modifier = Modifier.fillMaxWidth(),
@@ -55,6 +56,17 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
             modifier = Modifier.padding(vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            val tempTextStyle = TextStyle(
+                fontSize = 120.sp,
+                fontWeight = FontWeight.Light,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            val degreeTextStyle = TextStyle(
+                fontSize = 60.sp,
+                fontWeight = FontWeight.Light,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+            )
+
             AnimatedContent(
                 targetState = displayTemp.toString(),
                 transitionSpec = {
@@ -63,44 +75,34 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
                 },
                 label = "temp_anim"
             ) { temp ->
-                Layout(
+                val tempLayout = remember(temp, tempTextStyle) {
+                    textMeasurer.measure(temp, style = tempTextStyle)
+                }
+                val degreeLayout = remember(degreeTextStyle) {
+                    textMeasurer.measure("°", style = degreeTextStyle)
+                }
+
+                Box(
                     modifier = Modifier.fillMaxWidth(),
-                    content = {
-                        Text(
-                            text = temp,
-                            style = MaterialTheme.typography.displayLarge.copy(
-                                fontSize = 120.sp,
-                                fontWeight = FontWeight.Light,
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            textAlign = TextAlign.Center
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.size(300.dp, 140.dp)) {
+                        val centerX = size.width / 2
+                        val tempX = centerX - tempLayout.size.width / 2
+                        val degreeX = tempX + tempLayout.size.width
+
+                        val tempY = 0f
+                        val degreeY = tempY + (tempLayout.size.height * 0.09f) - 1f
+
+                        drawText(
+                            textLayoutResult = tempLayout,
+                            topLeft = Offset(tempX, tempY)
                         )
-                        Text(
-                            text = "°",
-                            style = MaterialTheme.typography.displayLarge.copy(
-                                fontSize = 60.sp,
-                                fontWeight = FontWeight.Light,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-                            )
+
+                        drawText(
+                            textLayoutResult = degreeLayout,
+                            topLeft = Offset(degreeX, degreeY)
                         )
-                    }
-                ) { measurables, constraints ->
-                    val numberPlaceable = measurables[0].measure(constraints.copy(minWidth = 0))
-                    val degreePlaceable = measurables[1].measure(constraints.copy(minWidth = 0))
-
-                    val layoutWidth = if (constraints.hasBoundedWidth) constraints.maxWidth else (numberPlaceable.width + degreePlaceable.width)
-                    val layoutHeight = max(numberPlaceable.height, degreePlaceable.height)
-
-                    val centerX = layoutWidth / 2
-                    val numberX = centerX - numberPlaceable.width / 2
-                    val degreeX = numberX + numberPlaceable.width
-
-                    val numberY = (layoutHeight - numberPlaceable.height) / 2
-                    val degreeY = (layoutHeight - degreePlaceable.height) / 2
-
-                    layout(layoutWidth, layoutHeight) {
-                        numberPlaceable.place(numberX, numberY)
-                        degreePlaceable.place(degreeX, degreeY)
                     }
                 }
             }
