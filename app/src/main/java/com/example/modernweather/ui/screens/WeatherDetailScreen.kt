@@ -15,11 +15,16 @@ import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -136,7 +141,7 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item(key = "current_weather") {
-            CurrentWeatherSection(current = data.currentWeather, unit = unit)
+            CurrentWeatherSection(current = data.currentWeather, hourly = data.hourlyForecast, unit = unit)
         }
 
         data.alert?.let { alert ->
@@ -253,48 +258,6 @@ fun WeatherLoadingSceleton() {
 fun ErrorState(message: String) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text(message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
-@OptIn(ExperimentalAnimationApi::class)
-@Composable
-fun CurrentWeatherSection(current: CurrentWeather, unit: TemperatureUnit) {
-    val displayTemp = if (unit == TemperatureUnit.CELSIUS) current.temperature else toFahrenheit(current.temperature)
-    val displayFeelsLike = if (unit == TemperatureUnit.CELSIUS) current.feelsLike else toFahrenheit(current.feelsLike)
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        AnimatedContent(
-            targetState = displayTemp,
-            transitionSpec = {
-                (slideInVertically { height -> height } + fadeIn()) togetherWith
-                        (slideOutVertically { height -> -height } + fadeOut())
-            }, label = "temp_anim"
-        ) { temp ->
-            Text(
-                text = temp.toString(),
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontSize = 100.sp,
-                    fontWeight = FontWeight.Light
-                ),
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-        }
-
-        Text(
-            text = current.condition,
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Text(
-            text = "Odczuwalna ${displayFeelsLike}°",
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
