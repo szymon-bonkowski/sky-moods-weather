@@ -51,7 +51,8 @@ data class CurrentWeather(
     val highTemp: Int,
     val lowTemp: Int,
     val condition: String,
-    val conditionEnum: WeatherCondition
+    val conditionEnum: WeatherCondition,
+    val temperatureComparison: String = ""
 )
 
 data class HourlyForecast(

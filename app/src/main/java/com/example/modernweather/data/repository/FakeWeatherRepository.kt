@@ -64,7 +64,8 @@ class FakeWeatherRepository : WeatherRepository {
                 highTemp = 26,
                 lowTemp = 13,
                 condition = "Przeważnie pochmurno",
-                conditionEnum = WeatherCondition.DAY_PARTLY_CLOUDY
+                conditionEnum = WeatherCondition.DAY_PARTLY_CLOUDY,
+                temperatureComparison = "Cieplej o 2° niż wczoraj"
             ),
             alert = WeatherAlert(
                 id = "alert1",

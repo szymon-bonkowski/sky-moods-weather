@@ -7,7 +7,11 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -72,22 +76,30 @@ fun WeeklyForecastChart(
 
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val animationProgress = remember { Animatable(0f) }
 
     val dayPainters = dailyForecasts.map {
-        painterResource(id = mapConditionToPng(it.conditionEnum, true))
+        painterResource(id = weatherConditionIconRes(it.conditionEnum, true))
     }
     val nightPainters = dailyForecasts.map {
-        painterResource(id = mapConditionToPng(it.conditionEnum, false))
+        painterResource(id = weatherConditionIconRes(it.conditionEnum, false))
     }
 
-    val forecastKey = remember(dailyForecasts.size, dailyForecasts.firstOrNull()?.date) {
-        "${dailyForecasts.size}_${dailyForecasts.firstOrNull()?.date}"
+    val forecastKey = remember(dailyForecasts) {
+        dailyForecasts.joinToString("|") { forecast ->
+            "${forecast.date}:${forecast.highTemp}:${forecast.lowTemp}:${forecast.conditionEnum}"
+        }
     }
 
-    LaunchedEffect(forecastKey) {
+    var hasAnimated by rememberSaveable(forecastKey) { mutableStateOf(false) }
+    val animationProgress = remember(forecastKey, hasAnimated) {
+        Animatable(if (hasAnimated) 1f else 0f)
+    }
+
+    LaunchedEffect(forecastKey, hasAnimated) {
+        if (hasAnimated) return@LaunchedEffect
         animationProgress.snapTo(0f)
         animationProgress.animateTo(1f, animationSpec = tween(durationMillis = 1500))
+        hasAnimated = true
     }
 
     Canvas(modifier = modifier.fillMaxSize()) {
@@ -443,45 +455,6 @@ private fun DrawScope.drawLabels(
             dayOfMonthLayout,
             topLeft = Offset(point.xPosition - dayOfMonthLayout.size.width / 2, size.height - 32.dp.toPx())
         )
-    }
-}
-
-@DrawableRes
-private fun mapConditionToPng(condition: WeatherCondition, isDay: Boolean): Int {
-    return if (isDay) {
-        when (condition) {
-            WeatherCondition.DAY_SUNNY -> R.drawable.day
-            WeatherCondition.DAY_PARTLY_CLOUDY -> R.drawable.cloudy_day
-            WeatherCondition.DAY_CLOUDY -> R.drawable.cloudy
-            WeatherCondition.DAY_RAIN_LIGHT -> R.drawable.light_rain_day
-            WeatherCondition.DAY_RAIN_MEDIUM -> R.drawable.medium_rain_day
-            WeatherCondition.DAY_RAIN_HEAVY -> R.drawable.heavy_rain
-            WeatherCondition.DAY_SNOW -> R.drawable.snow_day
-            WeatherCondition.DAY_FOG -> R.drawable.fog_day
-            WeatherCondition.DAY_FOG_CLOUDY -> R.drawable.fog_cloudy
-            WeatherCondition.DAY_THUNDERSTORM -> R.drawable.thunderstorm_day
-            WeatherCondition.DAY_THUNDERSTORM_HEAVY -> R.drawable.thunderstorm_heavy_rain
-            WeatherCondition.DAY_THUNDERSTORM_RAIN_LIGHT -> R.drawable.thunderstorm_light_rain_day
-            WeatherCondition.DAY_THUNDERSTORM_RAIN_MEDIUM -> R.drawable.thunderstorm_medium_rain_day
-            WeatherCondition.DAY_WIND -> R.drawable.wind_day
-            WeatherCondition.DAY_WIND_CLOUDY -> R.drawable.wind_cloudy
-            else -> R.drawable.cloudy
-        }
-    } else {
-        when (condition) {
-            WeatherCondition.NIGHT_CLEAR -> R.drawable.night
-            WeatherCondition.NIGHT_PARTLY_CLOUDY -> R.drawable.cloudy_night
-            WeatherCondition.NIGHT_CLOUDY -> R.drawable.cloudy_night
-            WeatherCondition.NIGHT_RAIN_LIGHT -> R.drawable.light_rain_night
-            WeatherCondition.NIGHT_RAIN_MEDIUM -> R.drawable.medium_rain_night
-            WeatherCondition.NIGHT_SNOW -> R.drawable.snow_night
-            WeatherCondition.NIGHT_FOG -> R.drawable.fog_night
-            WeatherCondition.NIGHT_THUNDERSTORM -> R.drawable.thunderstorm_night
-            WeatherCondition.NIGHT_THUNDERSTORM_RAIN_LIGHT -> R.drawable.thunderstorm_light_rain_night
-            WeatherCondition.NIGHT_THUNDERSTORM_MEDIUM_RAIN -> R.drawable.thunderstorm_medium_rain_night
-            WeatherCondition.NIGHT_WIND -> R.drawable.wind_night
-            else -> R.drawable.cloudy_night
-        }
     }
 }
 

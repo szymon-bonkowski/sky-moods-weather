@@ -8,6 +8,7 @@ import com.example.modernweather.data.models.*
 import com.example.modernweather.data.repository.FakeWeatherRepository
 import com.example.modernweather.data.repository.SettingsRepository
 import com.example.modernweather.data.repository.WeatherRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -19,7 +20,7 @@ data class LocationsUiState(
 
 sealed interface WeatherDetailUiState {
     data object Loading : WeatherDetailUiState
-    data class Success(val weatherData: WeatherData, val aiInsight: String) : WeatherDetailUiState
+    data class Success(val weatherData: WeatherData) : WeatherDetailUiState
     data class Error(val message: String) : WeatherDetailUiState
 }
 
@@ -37,6 +38,8 @@ class WeatherViewModel(application: Application) : ViewModel() {
 
     private val weatherRepository: WeatherRepository = FakeWeatherRepository()
     private val settingsRepository: SettingsRepository = SettingsRepository(application)
+    private var weatherDetailJob: Job? = null
+    private var weatherDetailLocationId: String? = null
 
     private val _locationsState = MutableStateFlow(LocationsUiState())
     val locationsState = _locationsState.asStateFlow()
@@ -63,15 +66,26 @@ class WeatherViewModel(application: Application) : ViewModel() {
     }
 
     fun loadWeatherData(locationId: String) {
-        viewModelScope.launch {
+        val currentState = _weatherDetailState.value
+        if (currentState is WeatherDetailUiState.Success && currentState.weatherData.location.id == locationId) {
+            return
+        }
+
+        if (weatherDetailLocationId == locationId && weatherDetailJob?.isActive == true) {
+            return
+        }
+
+        weatherDetailJob?.cancel()
+        weatherDetailLocationId = locationId
+
+        weatherDetailJob = viewModelScope.launch {
             _weatherDetailState.value = WeatherDetailUiState.Loading
             weatherRepository.getWeatherData(locationId)
                 .catch { e ->
                     _weatherDetailState.value = WeatherDetailUiState.Error("Nie udało się załadować danych: ${e.message}")
                 }
                 .collect { data ->
-                    val insight = generateAiInsight(data)
-                    _weatherDetailState.value = WeatherDetailUiState.Success(data, insight)
+                    _weatherDetailState.value = WeatherDetailUiState.Success(data)
                 }
         }
     }
@@ -107,16 +121,5 @@ class WeatherViewModel(application: Application) : ViewModel() {
 
     fun getCurrentTime(): java.time.LocalTime {
         return java.time.LocalTime.now()
-    }
-
-    private fun generateAiInsight(data: WeatherData): String {
-        val temp = data.currentWeather.temperature
-        return when (data.currentWeather.conditionEnum) {
-            WeatherCondition.DAY_SUNNY -> "Czyste niebo i słońce przez cały dzień. Idealne warunki na aktywność na zewnątrz. Pamiętaj o kremie z filtrem, indeks UV może być wysoki."
-            WeatherCondition.DAY_THUNDERSTORM, WeatherCondition.NIGHT_THUNDERSTORM, WeatherCondition.DAY_THUNDERSTORM_HEAVY -> "Uwaga! Spodziewane są gwałtowne burze z silnym wiatrem. Unikaj otwartych przestrzeni i zabezpiecz luźne przedmioty na balkonie."
-            WeatherCondition.DAY_RAIN_LIGHT, WeatherCondition.DAY_RAIN_MEDIUM, WeatherCondition.DAY_RAIN_HEAVY, WeatherCondition.NIGHT_RAIN_LIGHT, WeatherCondition.NIGHT_RAIN_MEDIUM -> "Spodziewaj się przelotnych opadów deszczu. Warto zabrać ze sobą parasol lub kurtkę przeciwdeszczową. Drogi mogą być śliskie."
-            WeatherCondition.DAY_SNOW, WeatherCondition.NIGHT_SNOW -> "Zimowa aura w pełni. Opady śniegu mogą powodować utrudnienia w ruchu. Ubierz się ciepło i zachowaj ostrożność na chodnikach."
-            else -> "Pogoda będzie zmienna. Aktualnie temperatura wynosi $temp°C. W ciągu dnia możliwe są zarówno chwile ze słońcem, jak i przelotne opady. Bądź gotowy na wszystko."
-        }
     }
 }

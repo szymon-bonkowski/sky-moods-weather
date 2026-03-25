@@ -4,14 +4,11 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
@@ -20,19 +17,16 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.modernweather.R
 import com.example.modernweather.data.models.*
 import com.example.modernweather.ui.components.*
 import com.example.modernweather.ui.viewmodel.*
-import kotlinx.coroutines.launch
 
 fun toFahrenheit(celsius: Int): Int {
     return (celsius * 9 / 5) + 32
@@ -78,55 +72,12 @@ fun WeatherDetailScreen(
             when (val state = uiState) {
                 is WeatherDetailUiState.Loading -> WeatherLoadingSceleton()
                 is WeatherDetailUiState.Error -> ErrorState(message = state.message)
-                is WeatherDetailUiState.Success -> WeatherContent(
+                is WeatherDetailUiState.Success -> WeatherPage(
                     data = state.weatherData,
-                    settings = settingsState,
-                    aiInsight = state.aiInsight,
+                    unit = settingsState.temperatureUnit,
                     viewModel = viewModel,
                     onNavigateToRadar = onNavigateToRadar
                 )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun WeatherContent(
-    data: WeatherData,
-    settings: SettingsUiState,
-    aiInsight: String,
-    viewModel: WeatherViewModel,
-    onNavigateToRadar: () -> Unit
-) {
-    val pagerState = rememberPagerState(pageCount = { 2 })
-    val coroutineScope = rememberCoroutineScope()
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(
-            selectedTabIndex = pagerState.currentPage,
-            containerColor = Color.Transparent,
-            indicator = { tabPositions ->
-                if (pagerState.currentPage < tabPositions.size) {
-                    TabRowDefaults.SecondaryIndicator(
-                        modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
-        ) {
-            Tab(selected = pagerState.currentPage == 0,
-                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(0) } },
-                text = { Text("Pogoda") })
-            Tab(selected = pagerState.currentPage == 1,
-                onClick = { coroutineScope.launch { pagerState.animateScrollToPage(1) } },
-                text = { Text("AI Insights") })
-        }
-
-        HorizontalPager(state = pagerState) { page ->
-            when (page) {
-                0 -> WeatherPage(data = data, unit = settings.temperatureUnit, viewModel = viewModel, onNavigateToRadar = onNavigateToRadar)
-                1 -> AiInsightPage(insight = aiInsight)
             }
         }
     }
@@ -164,13 +115,9 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
         }
 
         item(key = "details_aqi") {
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(modifier = Modifier.weight(1f)) {
-                    DetailsGrid(details = data.weatherDetails)
-                }
-                Box(modifier = Modifier.weight(1f)) {
-                    AqiSection(details = data.weatherDetails)
-                }
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                DetailsGrid(details = data.weatherDetails)
+                AqiSection(details = data.weatherDetails)
             }
         }
 
@@ -181,37 +128,6 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
         item(key = "sun_cycle") {
             SunCycleSection(sunInfo = stableSunInfo, viewModel = viewModel)
         }
-    }
-}
-
-@Composable
-fun AiInsightPage(insight: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Icon(
-            imageVector = Icons.Default.AutoAwesome,
-            contentDescription = "AI Icon",
-            modifier = Modifier.size(48.dp),
-            tint = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.height(16.dp))
-        Text(
-            text = "Analiza AI",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = insight,
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -266,18 +182,20 @@ fun DetailsGrid(details: WeatherDetails) {
     TitledCard(title = "SZCZEGÓŁY") {
         Column(
             modifier = Modifier
-                .padding(16.dp)
-                .height(150.dp),
-            verticalArrangement = Arrangement.SpaceAround
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(Modifier.fillMaxWidth()) {
                 DetailItem("Wiatr", "${details.windSpeed} km/h", Icons.Default.Air, Modifier.weight(1f))
-            }
-            Row(Modifier.fillMaxWidth()) {
                 DetailItem("Ciśnienie", "${details.pressure} hPa", Icons.Default.Speed, Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth()) {
                 DetailItem("Wilgotność", "${details.humidity}%", Icons.Default.WaterDrop, Modifier.weight(1f))
+                DetailItem("Indeks UV", "${details.uvIndex}", Icons.Default.WbSunny, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth()) {
+                DetailItem("Zachmurzenie", "${details.cloudCover}%", Icons.Default.Cloud, Modifier.weight(1f))
+                DetailItem("Widoczność", details.visibility, Icons.Default.Visibility, Modifier.weight(1f))
             }
         }
     }
