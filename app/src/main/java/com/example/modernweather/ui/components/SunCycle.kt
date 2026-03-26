@@ -234,14 +234,23 @@ fun SunArc(progress: Float, isDay: Boolean) {
         )
     }
 
+    val backgroundClouds = remember(clouds) { clouds.filter { !it.isForeground } }
+    val foregroundClouds = remember(clouds) { clouds.filter { it.isForeground } }
+
     val infiniteTransition = rememberInfiniteTransition(label = "animations")
 
     var continuousTime by remember { mutableStateOf(0f) }
     LaunchedEffect(Unit) {
         val startTime = withFrameNanos { it }
+        var lastUpdateTime = startTime
+        val minFrameInterval = 16_666_666L // ~60fps throttling
+
         while (true) {
             withFrameNanos { frameTime ->
-                continuousTime = (frameTime - startTime) / 1_000_000_000f
+                if (frameTime - lastUpdateTime >= minFrameInterval) {
+                    continuousTime = (frameTime - startTime) / 1_000_000_000f
+                    lastUpdateTime = frameTime
+                }
             }
         }
     }
@@ -304,23 +313,23 @@ fun SunArc(progress: Float, isDay: Boolean) {
 
             clipPath(path = skyPath) {
                 translate(left = backgroundDrift - cloudscapeWidth) {
-                    clouds.filter { !it.isForeground }.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
+                    backgroundClouds.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
                 }
                 translate(left = backgroundDrift) {
-                    clouds.filter { !it.isForeground }.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
+                    backgroundClouds.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
                 }
                 translate(left = backgroundDrift + cloudscapeWidth) {
-                    clouds.filter { !it.isForeground }.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
+                    backgroundClouds.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
                 }
 
                 translate(left = foregroundDrift - cloudscapeWidth) {
-                    clouds.filter { it.isForeground }.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
+                    foregroundClouds.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
                 }
                 translate(left = foregroundDrift) {
-                    clouds.filter { it.isForeground }.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
+                    foregroundClouds.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
                 }
                 translate(left = foregroundDrift + cloudscapeWidth) {
-                    clouds.filter { it.isForeground }.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
+                    foregroundClouds.forEach { cloud -> drawStyledCloud(cloud, sunAlpha) }
                 }
             }
         }
@@ -328,15 +337,25 @@ fun SunArc(progress: Float, isDay: Boolean) {
         drawArc(color = arcTrackColor, startAngle = 180f, sweepAngle = 180f, useCenter = false, topLeft = arcTopLeft, size = arcSize, style = Stroke(width = 6f))
 
         if (moonAlpha > 0) {
+            val arcCenterX = arcCenter.x
+            val arcCenterY = arcCenter.y
+            val arcRadiusSq = arcRadius * arcRadius
+            val horizonYMinus2 = horizonY - 2f
+
             starData.forEach { star ->
-                val starX = arcCenter.x + (star.position.x - 0.5f) * 2 * arcRadius * 0.95f
+                val starX = arcCenterX + (star.position.x - 0.5f) * 2 * arcRadius * 0.95f
                 val starY = horizonY - star.position.y * arcRadius * 0.9f
                 val twinklePhase = continuousTime * star.twinkleSpeed + star.phaseOffset
                 val twinkleIntensity = (sin(twinklePhase) + 1f) / 2f
                 val currentStarAlpha = (star.baseAlpha * (0.4f + 0.6f * twinkleIntensity)) * moonAlpha
                 val currentStarRadius = star.baseRadius * (0.8f + 0.2f * twinkleIntensity)
-                val distance = kotlin.math.sqrt((starX - arcCenter.x).let { it * it } + (starY - arcCenter.y).let { it * it })
-                if (distance <= arcRadius - (currentStarRadius + 8f) && starY < horizonY - (currentStarRadius + 2f)) {
+
+                val dx = starX - arcCenterX
+                val dy = starY - arcCenterY
+                val distanceSq = dx * dx + dy * dy
+                val minRadiusSq = (arcRadius - currentStarRadius - 8f).let { it * it }
+
+                if (distanceSq <= minRadiusSq && starY < horizonYMinus2 - currentStarRadius) {
                     drawCircle(color = Color.White.copy(alpha = currentStarAlpha), radius = currentStarRadius, center = Offset(starX, starY))
                 }
             }
