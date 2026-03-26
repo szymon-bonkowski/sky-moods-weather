@@ -14,11 +14,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -46,6 +49,7 @@ import kotlin.random.Random
 fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>, unit: TemperatureUnit) {
     val displayTemp = if (unit == TemperatureUnit.CELSIUS) current.temperature else toFahrenheit(current.temperature)
     val textMeasurer = rememberTextMeasurer()
+    val density = LocalDensity.current
 
     Box(
         modifier = Modifier.fillMaxWidth(),
@@ -54,16 +58,16 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
         WeatherParticleSystem(condition = current.conditionEnum)
 
         Column(
-            modifier = Modifier.padding(top = 12.dp, bottom = 16.dp),
+            modifier = Modifier.padding(top = 0.dp, bottom = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             val tempTextStyle = TextStyle(
-                fontSize = 120.sp,
+                fontSize = 96.sp,
                 fontWeight = FontWeight.Light,
                 color = MaterialTheme.colorScheme.onSurface
             )
             val degreeTextStyle = TextStyle(
-                fontSize = 60.sp,
+                fontSize = 52.sp,
                 fontWeight = FontWeight.Light,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
             )
@@ -82,12 +86,17 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
                 val degreeLayout = remember(degreeTextStyle) {
                     textMeasurer.measure("°", style = degreeTextStyle)
                 }
+                val tempCanvasHeight = remember(tempLayout, degreeLayout, density) {
+                    with(density) {
+                        (maxOf(tempLayout.size.height, degreeLayout.size.height).toFloat() + 4.dp.toPx()).toDp()
+                    }
+                }
 
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
                 ) {
-                    Canvas(modifier = Modifier.size(300.dp, 120.dp)) {
+                    Canvas(modifier = Modifier.size(300.dp, tempCanvasHeight)) {
                         val centerX = size.width / 2
                         val tempX = centerX - tempLayout.size.width / 2
                         val degreeX = tempX + tempLayout.size.width
@@ -108,7 +117,7 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
                 }
             }
 
-            Spacer(modifier = Modifier.height(0.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = current.condition,
@@ -116,7 +125,7 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             val displayFeelsLike = if (unit == TemperatureUnit.CELSIUS) current.feelsLike else toFahrenheit(current.feelsLike)
             Text(
@@ -126,7 +135,7 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             HourlyWaveChart(
                 hourlyForecast = hourly,
@@ -216,12 +225,12 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(140.dp)
             .clipToBounds()
     ) {
         val scope = this
         val viewportWidthPx = with(density) { scope.maxWidth.toPx() }
-        val pointSpacingPx = with(density) { 64.dp.toPx() }
+        val pointSpacingPx = with(density) { 72.dp.toPx() }
         val chartWidthPx = max(
             viewportWidthPx,
             edgePaddingPx * 2 + pointSpacingPx * (hourlyForecast.size - 1).coerceAtLeast(1)
@@ -237,6 +246,7 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
             (anchor - viewportWidthPx / 2f).coerceIn(0f, maxScroll).toInt()
         }
         val scrollState = rememberScrollState(initial = initialScrollPx)
+        val baselineAxisColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
 
         Box(
             modifier = Modifier
@@ -252,19 +262,25 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
                 val points = hourlyForecast.size
                 if (points < 2) return@Canvas
 
-                val minTemp = displayTemps.minOrNull() ?: 0
-                val maxTemp = displayTemps.maxOrNull() ?: 0
+                val dataMinTemp = displayTemps.minOrNull() ?: 0
+                val dataMaxTemp = displayTemps.maxOrNull() ?: 0
+                val dataRange = (dataMaxTemp - dataMinTemp).coerceAtLeast(1)
+                val tempMargin = (dataRange * 0.3f).toInt().coerceAtLeast(3)
+                val minTemp = dataMinTemp - tempMargin
+                val maxTemp = dataMaxTemp + tempMargin
                 val tempRange = (maxTemp - minTemp).coerceAtLeast(1)
                 val path = Path()
                 val pathPoints = mutableListOf<Offset>()
                 val xStep = (size.width - 2 * edgePaddingPx) / (points - 1)
-                val yPadding = size.height * 0.3f
-                val chartHeight = size.height - yPadding
+                val yPaddingTop = 44.dp.toPx()
+                val timeLabelHeight = timeTextLayouts.maxOfOrNull { it.size.height.toFloat() } ?: 40f
+                val baselineY = size.height - timeLabelHeight - 16.dp.toPx()
+                val chartHeight = baselineY - yPaddingTop
 
                 hourlyForecast.forEachIndexed { index, forecast ->
                     val temp = if (unit == TemperatureUnit.CELSIUS) forecast.temperature else toFahrenheit(forecast.temperature)
                     val x = edgePaddingPx + index * xStep
-                    val y = chartHeight - ((temp - minTemp).toFloat() / tempRange) * (chartHeight - yPadding)
+                    val y = baselineY - ((temp - minTemp).toFloat() / tempRange) * chartHeight
                     pathPoints.add(Offset(x, y))
                 }
 
@@ -283,11 +299,11 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
 
                     path.cubicTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y)
                 }
+                
                 val fillPath = Path().apply {
-                    moveTo(pathPoints.first().x, size.height)
-                    lineTo(pathPoints.first().x, pathPoints.first().y)
                     addPath(path)
-                    lineTo(pathPoints.last().x, size.height)
+                    lineTo(pathPoints.last().x, baselineY)
+                    lineTo(pathPoints.first().x, baselineY)
                     close()
                 }
 
@@ -298,10 +314,18 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
                     )
                 )
 
+                // Optional: Draw a subtle baseline axis
+                drawScope.drawLine(
+                    color = baselineAxisColor,
+                    start = Offset(pathPoints.first().x, baselineY),
+                    end = Offset(pathPoints.last().x, baselineY),
+                    strokeWidth = 1.dp.toPx()
+                )
+
                 drawScope.drawPath(
                     path = path,
                     brush = Brush.horizontalGradient(colors = fillGradientColors),
-                    style = Stroke(width = 2.dp.toPx())
+                    style = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 )
 
                 pathPoints.forEachIndexed { index, point ->
@@ -310,7 +334,10 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
                     val degreeWidth = degreeLayout.size.width
                     val totalWidth = tempTextWidth + degreeWidth
                     val startX = point.x - totalWidth / 2f
-                    val textY = point.y - 35.dp.toPx()
+                    val tempBlockHeight = max(tempTextLayout.size.height, degreeLayout.size.height).toFloat()
+                    val iconSize = 18.dp.toPx()
+                    val iconTop = point.y - iconSize - 2.dp.toPx()
+                    val textY = iconTop - tempBlockHeight - 6.dp.toPx()
 
                     drawScope.drawText(
                         textLayoutResult = tempTextLayout,
@@ -323,8 +350,7 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
                     )
 
                     val painter = iconPainters[index]
-                    val iconSize = 20.dp.toPx()
-                    drawScope.translate(left = point.x - iconSize / 2, top = point.y - 15.dp.toPx()) {
+                    drawScope.translate(left = point.x - iconSize / 2, top = iconTop) {
                         with(painter) {
                             draw(Size(iconSize, iconSize))
                         }
@@ -333,7 +359,7 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
                     val timeTextLayout: TextLayoutResult = timeTextLayouts[index]
                     drawScope.drawText(
                         textLayoutResult = timeTextLayout,
-                        topLeft = Offset(point.x - timeTextLayout.size.width / 2, size.height - timeTextLayout.size.height)
+                        topLeft = Offset(point.x - timeTextLayout.size.width / 2, baselineY + 8.dp.toPx())
                     )
                 }
             }

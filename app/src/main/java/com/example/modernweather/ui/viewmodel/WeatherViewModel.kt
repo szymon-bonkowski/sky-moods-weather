@@ -8,6 +8,9 @@ import com.example.modernweather.data.models.*
 import com.example.modernweather.data.repository.FakeWeatherRepository
 import com.example.modernweather.data.repository.SettingsRepository
 import com.example.modernweather.data.repository.WeatherRepository
+import com.example.modernweather.nowcast.data.NowcastRepository
+import com.example.modernweather.nowcast.model.NowcastAssessment
+import com.example.modernweather.nowcast.worker.NowcastScheduler
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -27,7 +30,10 @@ sealed interface WeatherDetailUiState {
 data class SettingsUiState(
     val temperatureUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
     val isSystemTheme: Boolean = true,
-    val isDarkTheme: Boolean = false
+    val isDarkTheme: Boolean = false,
+    val nowcastMonitoringEnabled: Boolean = true,
+    val nowcastNotificationsEnabled: Boolean = true,
+    val nowcastUseTfliteEnabled: Boolean = true
 )
 
 class WeatherViewModel(application: Application) : ViewModel() {
@@ -38,6 +44,8 @@ class WeatherViewModel(application: Application) : ViewModel() {
 
     private val weatherRepository: WeatherRepository = FakeWeatherRepository()
     private val settingsRepository: SettingsRepository = SettingsRepository(application)
+    private val nowcastRepository: NowcastRepository = NowcastRepository(application)
+    private val applicationContext = application.applicationContext
     private var weatherDetailJob: Job? = null
     private var weatherDetailLocationId: String? = null
 
@@ -47,22 +55,45 @@ class WeatherViewModel(application: Application) : ViewModel() {
     private val _weatherDetailState = MutableStateFlow<WeatherDetailUiState>(WeatherDetailUiState.Loading)
     val weatherDetailState = _weatherDetailState.asStateFlow()
 
-    val settingsState: StateFlow<SettingsUiState> = settingsRepository.userSettingsFlow
-        .map {
-            SettingsUiState(
-                temperatureUnit = it.temperatureUnit,
-                isSystemTheme = it.isSystemTheme,
-                isDarkTheme = it.isDarkTheme
-            )
-        }
+    val settingsState: StateFlow<SettingsUiState> = combine(
+        settingsRepository.userSettingsFlow,
+        nowcastRepository.settingsFlow
+    ) { userSettings, nowcastSettings ->
+        SettingsUiState(
+            temperatureUnit = userSettings.temperatureUnit,
+            isSystemTheme = userSettings.isSystemTheme,
+            isDarkTheme = userSettings.isDarkTheme,
+            nowcastMonitoringEnabled = nowcastSettings.monitoringEnabled,
+            nowcastNotificationsEnabled = nowcastSettings.notificationsEnabled,
+            nowcastUseTfliteEnabled = nowcastSettings.useTfliteModel
+        )
+    }
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = SettingsUiState()
         )
 
+    val nowcastAssessmentState: StateFlow<NowcastAssessment> = nowcastRepository.assessmentFlow
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = NowcastAssessment()
+        )
+
     init {
         loadSavedLocations()
+        viewModelScope.launch {
+            val nowcastSettings = nowcastRepository.getSettings()
+            if (nowcastSettings.monitoringEnabled) {
+                NowcastScheduler.schedule(
+                    context = applicationContext,
+                    intervalMinutes = nowcastSettings.sampleIntervalMinutes
+                )
+            } else {
+                NowcastScheduler.cancel(applicationContext)
+            }
+        }
     }
 
     fun loadWeatherData(locationId: String) {
@@ -96,6 +127,34 @@ class WeatherViewModel(application: Application) : ViewModel() {
 
     fun updateTheme(isSystem: Boolean, isDark: Boolean) {
         viewModelScope.launch { settingsRepository.updateTheme(isSystem, isDark) }
+    }
+
+    fun updateNowcastMonitoring(enabled: Boolean) {
+        viewModelScope.launch {
+            nowcastRepository.updateMonitoringEnabled(enabled)
+            val current = nowcastRepository.getSettings()
+            if (enabled) {
+                NowcastScheduler.schedule(
+                    context = applicationContext,
+                    intervalMinutes = current.sampleIntervalMinutes,
+                    immediate = true
+                )
+            } else {
+                NowcastScheduler.cancel(applicationContext)
+            }
+        }
+    }
+
+    fun updateNowcastNotifications(enabled: Boolean) {
+        viewModelScope.launch {
+            nowcastRepository.updateNotificationsEnabled(enabled)
+        }
+    }
+
+    fun updateNowcastUseTflite(enabled: Boolean) {
+        viewModelScope.launch {
+            nowcastRepository.updateUseTflite(enabled)
+        }
     }
 
     fun loadSavedLocations() {

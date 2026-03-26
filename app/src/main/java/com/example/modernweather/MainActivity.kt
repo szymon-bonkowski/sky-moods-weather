@@ -1,9 +1,11 @@
 package com.example.modernweather
 
+import android.Manifest
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -15,6 +17,10 @@ import com.example.modernweather.ui.theme.ModernWeatherTheme
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
 
 class MainActivity : ComponentActivity() {
+    private val requestNotificationPermission = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {}
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -31,6 +37,12 @@ class MainActivity : ComponentActivity() {
         }
 
         WeatherViewModel.Factory = viewModelFactory
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
 
         setContent {
             val viewModel: WeatherViewModel = viewModel(factory = WeatherViewModel.Factory)

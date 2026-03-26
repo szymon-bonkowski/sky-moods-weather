@@ -89,6 +89,17 @@ fun SettingsScreen(
                     }
                 )
             }
+
+            TitledCard(title = "LOKALNY NOWCAST") {
+                NowcastSettingsSection(
+                    monitoringEnabled = settingsState.nowcastMonitoringEnabled,
+                    notificationsEnabled = settingsState.nowcastNotificationsEnabled,
+                    useTflite = settingsState.nowcastUseTfliteEnabled,
+                    onMonitoringChanged = viewModel::updateNowcastMonitoring,
+                    onNotificationsChanged = viewModel::updateNowcastNotifications,
+                    onUseTfliteChanged = viewModel::updateNowcastUseTflite
+                )
+            }
         }
     }
 }
@@ -165,6 +176,33 @@ private fun SegmentedButtonRow(
             )
         ) {
             Text("°F")
+        }
+    }
+}
+
+@Composable
+private fun NowcastSettingsSection(
+    monitoringEnabled: Boolean,
+    notificationsEnabled: Boolean,
+    useTflite: Boolean,
+    onMonitoringChanged: (Boolean) -> Unit,
+    onNotificationsChanged: (Boolean) -> Unit,
+    onUseTfliteChanged: (Boolean) -> Unit
+) {
+    Column {
+        SettingItem(label = "Włącz lokalne wykrywanie frontów") {
+            Switch(checked = monitoringEnabled, onCheckedChange = onMonitoringChanged)
+        }
+
+        AnimatedVisibility(visible = monitoringEnabled) {
+            Column {
+                SettingItem(label = "Powiadomienia o zagrożeniu") {
+                    Switch(checked = notificationsEnabled, onCheckedChange = onNotificationsChanged)
+                }
+                SettingItem(label = "Model ML (TensorFlow Lite)") {
+                    Switch(checked = useTflite, onCheckedChange = onUseTfliteChanged)
+                }
+            }
         }
     }
 }

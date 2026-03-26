@@ -21,10 +21,13 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.modernweather.R
 import com.example.modernweather.data.models.*
+import com.example.modernweather.nowcast.model.LocalRiskLevel
+import com.example.modernweather.nowcast.model.NowcastAssessment
 import com.example.modernweather.ui.components.*
 import com.example.modernweather.ui.viewmodel.*
 
@@ -86,9 +89,10 @@ fun WeatherDetailScreen(
 @Composable
 fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherViewModel, onNavigateToRadar: () -> Unit) {
     val stableSunInfo = remember(data.location.id) { data.sunInfo }
+    val nowcastAssessment by viewModel.nowcastAssessmentState.collectAsState()
 
     LazyColumn(
-        contentPadding = PaddingValues(16.dp),
+        contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item(key = "current_weather") {
@@ -121,12 +125,55 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
             }
         }
 
+        item(key = "local_nowcast_status") {
+            LocalNowcastCard(assessment = nowcastAssessment)
+        }
+
         item(key = "radar") {
             RadarCard(onClick = onNavigateToRadar)
         }
 
         item(key = "sun_cycle") {
             SunCycleSection(sunInfo = stableSunInfo, viewModel = viewModel)
+        }
+    }
+}
+
+@Composable
+fun LocalNowcastCard(assessment: NowcastAssessment) {
+    val (title, color) = when (assessment.riskLevel) {
+        LocalRiskLevel.LOW -> "Niskie ryzyko nagłej burzy/frontu" to Color(0xFF4CAF50)
+        LocalRiskLevel.ELEVATED -> "Podwyższone ryzyko zmian pogodowych" to Color(0xFFFFB300)
+        LocalRiskLevel.HIGH -> "Wysokie ryzyko gwałtownego załamania pogody" to Color(0xFFFF7043)
+        LocalRiskLevel.SEVERE -> "Bardzo wysokie ryzyko burzy/silnego wiatru" to Color(0xFFE53935)
+    }
+
+    TitledCard("BAROMETR TELEFONU") {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+            assessment.latestPressureHpa?.let {
+                Text(
+                    text = "Ciśnienie: ${"%.1f".format(it)} hPa | Spadek 3h: ${"%.1f".format(assessment.pressureDrop3h)} hPa",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = assessment.reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Start
+            )
         }
     }
 }
