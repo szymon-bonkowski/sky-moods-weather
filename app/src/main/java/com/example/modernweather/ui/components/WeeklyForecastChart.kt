@@ -77,11 +77,15 @@ fun WeeklyForecastChart(
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
 
-    val dayPainters = dailyForecasts.map {
-        painterResource(id = weatherConditionIconRes(it.conditionEnum, true))
+    val dayPainters = remember(dailyForecasts) {
+        dailyForecasts.map {
+            painterResource(id = weatherConditionIconRes(it.conditionEnum, true))
+        }
     }
-    val nightPainters = dailyForecasts.map {
-        painterResource(id = weatherConditionIconRes(it.conditionEnum, false))
+    val nightPainters = remember(dailyForecasts) {
+        dailyForecasts.map {
+            painterResource(id = weatherConditionIconRes(it.conditionEnum, false))
+        }
     }
 
     val forecastKey = remember(dailyForecasts) {
