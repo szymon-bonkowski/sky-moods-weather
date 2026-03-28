@@ -330,18 +330,25 @@ private fun DrawScope.drawCenteredLineSegment(
         )
     }
 
-    val segmentProgress = progress.coerceIn(0f, 1f)
-    val animatedPath = Path()
-    PathMeasure().apply {
-        setPath(path, false)
-        getSegment(0f, length * segmentProgress, animatedPath, true)
-    }
+    if (progress >= 1f) {
+        drawPath(
+            path = path,
+            color = color,
+            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+        )
+    } else {
+        val segmentProgress = progress.coerceIn(0f, 1f)
+        val pathMeasure = PathMeasure()
+        val animatedPath = Path()
+        pathMeasure.setPath(path, false)
+        pathMeasure.getSegment(0f, pathMeasure.length * segmentProgress, animatedPath, true)
 
-    drawPath(
-        path = animatedPath,
-        color = color,
-        style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-    )
+        drawPath(
+            path = animatedPath,
+            color = color,
+            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+        )
+    }
 }
 
 private fun DrawScope.drawGridLines(
@@ -354,14 +361,13 @@ private fun DrawScope.drawGridLines(
     val gapBuffer = 3.dp.toPx()
 
     points.forEach { point ->
-        val obstacles = listOf(
+        val sortedObstacles = listOf(
             point.highTempRegion,
             point.highIconRegion,
             point.lowIconRegion,
             point.lowTempRegion
-        )
+        ).sortedBy { it.top }
 
-        val sortedObstacles = obstacles.sortedBy { it.top }
         var currentY = yTop
 
         for (obstacle in sortedObstacles) {

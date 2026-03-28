@@ -323,39 +323,45 @@ fun SunCycleSection(sunInfo: SunInfo, viewModel: WeatherViewModel) {
 
 @Composable
 fun AlertCard(alert: WeatherAlert) {
-    val (backgroundColor, contentColor, icon) = when (alert.severity) {
+    val isDark = isSystemInDarkTheme()
+
+    val (containerColor, contentColor, icon) = when (alert.severity) {
         AlertSeverity.INFO -> Triple(
-            MaterialTheme.colorScheme.primaryContainer,
-            MaterialTheme.colorScheme.onPrimaryContainer,
+            if (isDark) Color(0xFF0F2942) else Color(0xFFE8F2FA),
+            if (isDark) Color(0xFF7CB6F5) else Color(0xFF104A82),
             Icons.Default.Info
         )
         AlertSeverity.WARNING -> Triple(
-            Color(0xFFFFF3E0),
-            Color(0xFFE65100),
+            if (isDark) Color(0xFF3D2E1A) else Color(0xFFFDF3E1),
+            if (isDark) Color(0xFFF3AF5D) else Color(0xFF8C500A),
             Icons.Default.Warning
         )
         AlertSeverity.SEVERE -> Triple(
-            Color(0xFFFFEBEE),
-            Color(0xFFD32F2F),
+            if (isDark) Color(0xFF451E1E) else Color(0xFFFCE8E8),
+            if (isDark) Color(0xFFF28B8B) else Color(0xFF9E1B1B),
             Icons.Default.Dangerous
         )
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = backgroundColor)
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            verticalAlignment = Alignment.Top,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
                 tint = contentColor,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(24.dp).padding(top = 2.dp)
             )
 
             Column(modifier = Modifier.weight(1f)) {
@@ -365,17 +371,18 @@ fun AlertCard(alert: WeatherAlert) {
                     color = contentColor,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = alert.description,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = contentColor.copy(alpha = 0.8f)
+                    color = contentColor.copy(alpha = 0.9f),
+                    lineHeight = 20.sp
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
                 Text(
                     text = "Ważne do: ${alert.expirationTime}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = contentColor.copy(alpha = 0.7f)
+                    style = MaterialTheme.typography.labelMedium,
+                    color = contentColor.copy(alpha = 0.75f)
                 )
             }
         }
