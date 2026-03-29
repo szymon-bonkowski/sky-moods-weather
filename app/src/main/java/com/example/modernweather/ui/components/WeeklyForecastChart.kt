@@ -47,9 +47,9 @@ private data class ForecastPoint(
     val highTemp: Int,
     val lowTemp: Int,
     val condition: WeatherCondition,
-    val xPosition: Float = 0f,
-    val highYRaw: Float = 0f,
-    val lowYRaw: Float = 0f,
+    var xPosition: Float = 0f,
+    var highYRaw: Float = 0f,
+    var lowYRaw: Float = 0f,
     var highYPosition: Float = 0f,
     var lowYPosition: Float = 0f,
     var highIconRegion: Region = Region(0f, 0f, 0f, 0f),
@@ -141,17 +141,23 @@ fun WeeklyForecastChart(
 
         adjustForecastPositions(forecastPoints, minIconSpacing, iconSize, tempTextHeight, chartHeight, yTopPadding)
 
-        calculateElementRegions(forecastPoints, textMeasurer, unit, iconSize, density)
-
-        drawGridLines(forecastPoints, yTopPadding, size.height - yBottomPadding)
+        // Skip expensive region calculations during animation on low-end devices
+        val isAnimating = animationProgress.value < 0.99f
+        if (!isAnimating) {
+            calculateElementRegions(forecastPoints, textMeasurer, unit, iconSize, density)
+            drawGridLines(forecastPoints, yTopPadding, size.height - yBottomPadding)
+        }
 
         drawTemperatureLines(forecastPoints, AccentYellow, AccentBlue, animationProgress.value, iconSize)
 
-        drawLabels(forecastPoints, textMeasurer, unit, size)
+        // Only draw labels and icons when animation is mostly complete
+        if (animationProgress.value > 0.3f) {
+            drawLabels(forecastPoints, textMeasurer, unit, size)
 
-        forecastPoints.forEachIndexed { index, point ->
-            drawWeatherIcon(dayPainters[index], point.xPosition, point.highYPosition, iconSize, animationProgress.value)
-            drawWeatherIcon(nightPainters[index], point.xPosition, point.lowYPosition, iconSize, animationProgress.value)
+            forecastPoints.forEachIndexed { index, point ->
+                drawWeatherIcon(dayPainters[index], point.xPosition, point.highYPosition, iconSize, animationProgress.value)
+                drawWeatherIcon(nightPainters[index], point.xPosition, point.lowYPosition, iconSize, animationProgress.value)
+            }
         }
     }
 }

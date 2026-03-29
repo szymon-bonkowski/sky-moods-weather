@@ -275,8 +275,10 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
     val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     val pointFillColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
 
-    val iconPainters = hourlyForecast.map {
-        painterResource(id = weatherConditionIconRes(it.conditionEnum))
+    val iconPainters = remember(hourlyForecast) {
+        hourlyForecast.map {
+            painterResource(id = weatherConditionIconRes(it.conditionEnum))
+        }
     }
 
     val tempTextLayouts = remember(hourlyForecast, unit, tempTextStyle) {

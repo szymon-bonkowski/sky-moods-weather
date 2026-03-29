@@ -1,5 +1,8 @@
 package com.example.modernweather.data.models
 
+import androidx.compose.runtime.Immutable
+
+@Immutable
 data class WeatherData(
     val location: Location,
     val currentWeather: CurrentWeather,
