@@ -213,7 +213,7 @@ fun SunArc(progress: Float, isDay: Boolean) {
     )
 
     val starData = remember {
-        List(100) {
+        List(60) { // Reduced from 100 to 60 stars for low-end devices
             StarData(
                 position = Offset(Random.nextFloat(), Random.nextFloat()),
                 baseAlpha = Random.nextFloat() * 0.8f + 0.2f,

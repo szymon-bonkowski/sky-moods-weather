@@ -91,12 +91,17 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
     val stableSunInfo = remember(data.location.id) { data.sunInfo }
     val nowcastAssessment by viewModel.nowcastAssessmentState.collectAsState()
 
+    // Use derivedStateOf to avoid recomposition when scrolling
+    val stableHourlyForecast = remember(data.hourlyForecast) { data.hourlyForecast }
+    val stableDailyForecast = remember(data.dailyForecast) { data.dailyForecast }
+    val stableDetails = remember(data.weatherDetails) { data.weatherDetails }
+
     LazyColumn(
         contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item(key = "current_weather") {
-            CurrentWeatherSection(current = data.currentWeather, hourly = data.hourlyForecast, unit = unit)
+            CurrentWeatherSection(current = data.currentWeather, hourly = stableHourlyForecast, unit = unit)
         }
 
         data.alert?.let { alert ->
@@ -112,7 +117,7 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(300.dp),
-                    dailyForecasts = data.dailyForecast,
+                    dailyForecasts = stableDailyForecast,
                     unit = unit
                 )
             }
@@ -120,8 +125,8 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
 
         item(key = "details_aqi") {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                DetailsGrid(details = data.weatherDetails)
-                AqiSection(details = data.weatherDetails)
+                DetailsGrid(details = stableDetails)
+                AqiSection(details = stableDetails)
             }
         }
 
