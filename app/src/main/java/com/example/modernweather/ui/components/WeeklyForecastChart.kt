@@ -10,7 +10,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -19,15 +18,18 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.modernweather.R
@@ -66,6 +68,30 @@ private data class Region(
     val bottom: Float
 )
 
+private data class LabelLayouts(
+    val highTemp: TextLayoutResult,
+    val highDegree: TextLayoutResult,
+    val lowTemp: TextLayoutResult,
+    val lowDegree: TextLayoutResult,
+    val day: TextLayoutResult,
+    val dot: TextLayoutResult?,
+    val dayOfMonth: TextLayoutResult
+)
+
+private data class RegionTempLayouts(
+    val high: TextLayoutResult,
+    val low: TextLayoutResult
+)
+
+private data class ChartLayoutData(
+    val points: List<ForecastPoint>,
+    val highLinePaths: List<Path>,
+    val lowLinePaths: List<Path>,
+    val yTopPadding: Float,
+    val yBottom: Float,
+    val iconSize: Float
+)
+
 @Composable
 fun WeeklyForecastChart(
     modifier: Modifier = Modifier,
@@ -76,16 +102,13 @@ fun WeeklyForecastChart(
 
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
-    val dayPainters = remember(dailyForecasts) {
-        dailyForecasts.map {
-            painterResource(id = weatherConditionIconRes(it.conditionEnum, true))
-        }
+    val dayPainters = dailyForecasts.map { forecast ->
+        painterResource(id = weatherConditionIconRes(forecast.conditionEnum, true))
     }
-    val nightPainters = remember(dailyForecasts) {
-        dailyForecasts.map {
-            painterResource(id = weatherConditionIconRes(it.conditionEnum, false))
-        }
+    val nightPainters = dailyForecasts.map { forecast ->
+        painterResource(id = weatherConditionIconRes(forecast.conditionEnum, false))
     }
 
     val forecastKey = remember(dailyForecasts) {
@@ -94,70 +117,164 @@ fun WeeklyForecastChart(
         }
     }
 
-    var hasAnimated by rememberSaveable(forecastKey) { mutableStateOf(false) }
-    val animationProgress = remember(forecastKey, hasAnimated) {
-        Animatable(if (hasAnimated) 1f else 0f)
+    val animationProgress = remember(forecastKey) {
+        Animatable(0f)
     }
 
-    LaunchedEffect(forecastKey, hasAnimated) {
-        if (hasAnimated) return@LaunchedEffect
+    LaunchedEffect(forecastKey) {
         animationProgress.snapTo(0f)
         animationProgress.animateTo(1f, animationSpec = tween(durationMillis = 1500))
-        hasAnimated = true
     }
 
-    Canvas(modifier = modifier.fillMaxSize()) {
-        val xPadding = 24.dp.toPx()
-        val yTopPadding = 15.dp.toPx()
-        val yBottomPadding = 60.dp.toPx()
-        val chartWidth = size.width - 2 * xPadding
-        val chartHeight = size.height - yTopPadding - yBottomPadding
-        val xStep = chartWidth / (dailyForecasts.size - 1).coerceAtLeast(1)
-        val iconSize = 24.dp.toPx()
-        val minIconSpacing = 36.dp.toPx()
-        val tempTextHeight = 16.sp.toPx() + 4.dp.toPx()
-
-        val (minTemp, maxTemp) = getMinMaxTemperatures(dailyForecasts, unit)
-        val tempRange = (maxTemp - minTemp).coerceAtLeast(1f)
-
-        val forecastPoints = dailyForecasts.mapIndexed { index, forecast ->
-            val highTempF = toFahrenheitAware(forecast.highTemp, unit).toFloat()
-            val lowTempF = toFahrenheitAware(forecast.lowTemp, unit).toFloat()
-
-            val highYRaw = yTopPadding + (1f - (highTempF - minTemp) / tempRange) * chartHeight
-            val lowYRaw = yTopPadding + (1f - (lowTempF - minTemp) / tempRange) * chartHeight
-
-            ForecastPoint(
-                index = index,
-                date = forecast.date,
-                highTemp = forecast.highTemp,
-                lowTemp = forecast.lowTemp,
-                condition = forecast.conditionEnum,
-                xPosition = xPadding + index * xStep,
-                highYRaw = highYRaw,
-                lowYRaw = lowYRaw
+    val regionTempLayouts = remember(dailyForecasts, unit, textMeasurer) {
+        val style = TextStyle(fontSize = 16.sp)
+        dailyForecasts.map { forecast ->
+            RegionTempLayouts(
+                high = textMeasurer.measure(
+                    text = "${toFahrenheitAware(forecast.highTemp, unit)}°",
+                    style = style
+                ),
+                low = textMeasurer.measure(
+                    text = "${toFahrenheitAware(forecast.lowTemp, unit)}°",
+                    style = style
+                )
             )
         }
+    }
 
-        adjustForecastPositions(forecastPoints, minIconSpacing, iconSize, tempTextHeight, chartHeight, yTopPadding)
-
-        // Skip expensive region calculations during animation on low-end devices
-        val isAnimating = animationProgress.value < 0.99f
-        if (!isAnimating) {
-            calculateElementRegions(forecastPoints, textMeasurer, unit, iconSize, density)
-            drawGridLines(forecastPoints, yTopPadding, size.height - yBottomPadding)
+    val labelLayouts = remember(dailyForecasts, unit, textMeasurer) {
+        val highLowStyle = TextStyle(
+            fontSize = 16.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = Color.White
+        )
+        val degreeStyle = highLowStyle
+        val dayMonthStyle = TextStyle(color = OnSurfaceVariant, fontSize = 14.sp)
+        dailyForecasts.map { forecast ->
+            var dayOfWeekText = forecast.date.dayOfWeek.getDisplayName(
+                JavaTextStyle.SHORT,
+                Locale.forLanguageTag("pl")
+            ).replaceFirstChar { it.titlecase(Locale.forLanguageTag("pl")) }
+            if (dayOfWeekText == "Niedz.") dayOfWeekText = "Ndz."
+            val dayOfWeekTextNoDot = dayOfWeekText.removeSuffix(".")
+            val dot = if (dayOfWeekText.endsWith(".")) "." else ""
+            val dayColor = if (forecast.date == LocalDate.now()) Color(0xFFFF6F6F) else OnSurfaceVariant
+            val dayStyle = TextStyle(color = dayColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            LabelLayouts(
+                highTemp = textMeasurer.measure(
+                    text = toFahrenheitAware(forecast.highTemp, unit).toString(),
+                    style = highLowStyle
+                ),
+                highDegree = textMeasurer.measure("°", style = degreeStyle),
+                lowTemp = textMeasurer.measure(
+                    text = toFahrenheitAware(forecast.lowTemp, unit).toString(),
+                    style = highLowStyle
+                ),
+                lowDegree = textMeasurer.measure("°", style = degreeStyle),
+                day = textMeasurer.measure(dayOfWeekTextNoDot, style = dayStyle),
+                dot = if (dot.isNotEmpty()) textMeasurer.measure(dot, style = dayStyle) else null,
+                dayOfMonth = textMeasurer.measure(forecast.date.dayOfMonth.toString(), style = dayMonthStyle)
+            )
         }
+    }
 
-        drawTemperatureLines(forecastPoints, AccentYellow, AccentBlue, animationProgress.value, iconSize)
+    val chartLayoutData = remember(dailyForecasts, unit, canvasSize, density, regionTempLayouts) {
+        if (canvasSize == IntSize.Zero) return@remember null
+        val sizeSnapshot = canvasSize
+        with(density) {
+            val chartSize = Size(sizeSnapshot.width.toFloat(), sizeSnapshot.height.toFloat())
+            val xPadding = 24.dp.toPx()
+            val yTopPadding = 15.dp.toPx()
+            val yBottomPadding = 60.dp.toPx()
+            val chartWidth = chartSize.width - 2 * xPadding
+            val chartHeight = chartSize.height - yTopPadding - yBottomPadding
+            val xStep = chartWidth / (dailyForecasts.size - 1).coerceAtLeast(1)
+            val iconSize = 24.dp.toPx()
+            val minIconSpacing = 36.dp.toPx()
+            val tempTextHeight = 16.sp.toPx() + 4.dp.toPx()
+            val (minTemp, maxTemp) = getMinMaxTemperatures(dailyForecasts, unit)
+            val tempRange = (maxTemp - minTemp).coerceAtLeast(1f)
 
-        // Only draw labels and icons when animation is mostly complete
-        if (animationProgress.value > 0.3f) {
-            drawLabels(forecastPoints, textMeasurer, unit, size)
-
-            forecastPoints.forEachIndexed { index, point ->
-                drawWeatherIcon(dayPainters[index], point.xPosition, point.highYPosition, iconSize, animationProgress.value)
-                drawWeatherIcon(nightPainters[index], point.xPosition, point.lowYPosition, iconSize, animationProgress.value)
+            val forecastPoints = dailyForecasts.mapIndexed { index, forecast ->
+                val highTempF = toFahrenheitAware(forecast.highTemp, unit).toFloat()
+                val lowTempF = toFahrenheitAware(forecast.lowTemp, unit).toFloat()
+                val highYRaw = yTopPadding + (1f - (highTempF - minTemp) / tempRange) * chartHeight
+                val lowYRaw = yTopPadding + (1f - (lowTempF - minTemp) / tempRange) * chartHeight
+                ForecastPoint(
+                    index = index,
+                    date = forecast.date,
+                    highTemp = forecast.highTemp,
+                    lowTemp = forecast.lowTemp,
+                    condition = forecast.conditionEnum,
+                    xPosition = xPadding + index * xStep,
+                    highYRaw = highYRaw,
+                    lowYRaw = lowYRaw
+                )
             }
+
+            adjustForecastPositions(
+                points = forecastPoints,
+                minSpacing = minIconSpacing,
+                iconSize = iconSize,
+                textHeight = tempTextHeight,
+                chartHeight = chartHeight,
+                topPadding = yTopPadding
+            )
+            calculateElementRegions(
+                points = forecastPoints,
+                tempLayouts = regionTempLayouts,
+                iconSize = iconSize,
+                density = this
+            )
+
+            val gapRadius = iconSize / 2 + 4.dp.toPx()
+            ChartLayoutData(
+                points = forecastPoints,
+                highLinePaths = buildLinePaths(forecastPoints, isHighTemp = true, gapRadius = gapRadius),
+                lowLinePaths = buildLinePaths(forecastPoints, isHighTemp = false, gapRadius = gapRadius),
+                yTopPadding = yTopPadding,
+                yBottom = chartSize.height - yBottomPadding,
+                iconSize = iconSize
+            )
+        }
+    }
+
+    Canvas(
+        modifier = modifier
+            .fillMaxSize()
+            .onSizeChanged { canvasSize = it }
+    ) {
+        val layoutData = chartLayoutData ?: return@Canvas
+        drawGridLinesWithProgress(
+            points = layoutData.points,
+            yTop = layoutData.yTopPadding,
+            yBottom = layoutData.yBottom,
+            progress = animationProgress.value
+        )
+        drawTemperatureLines(
+            highLinePaths = layoutData.highLinePaths,
+            lowLinePaths = layoutData.lowLinePaths,
+            highColor = AccentYellow,
+            lowColor = AccentBlue,
+            progress = animationProgress.value
+        )
+        drawLabels(layoutData.points, labelLayouts, size)
+
+        layoutData.points.forEachIndexed { index, point ->
+            drawWeatherIcon(
+                painter = dayPainters[index],
+                x = point.xPosition,
+                y = point.highYPosition,
+                iconSize = layoutData.iconSize,
+                alpha = animationProgress.value
+            )
+            drawWeatherIcon(
+                painter = nightPainters[index],
+                x = point.xPosition,
+                y = point.lowYPosition,
+                iconSize = layoutData.iconSize,
+                alpha = animationProgress.value
+            )
         }
     }
 }
@@ -212,13 +329,12 @@ private fun adjustForecastPositions(
 
 private fun calculateElementRegions(
     points: List<ForecastPoint>,
-    textMeasurer: TextMeasurer,
-    unit: TemperatureUnit,
+    tempLayouts: List<RegionTempLayouts>,
     iconSize: Float,
     density: Density
 ) {
     with(density) {
-        points.forEach { point ->
+        points.forEachIndexed { index, point ->
             val halfIconSize = iconSize / 2
             point.highIconRegion = Region(
                 point.xPosition - halfIconSize,
@@ -234,8 +350,7 @@ private fun calculateElementRegions(
                 point.lowYPosition + halfIconSize
             )
 
-            val highTempText = toFahrenheitAware(point.highTemp, unit).toString() + "°"
-            val highTempLayout = textMeasurer.measure(highTempText, style = TextStyle(fontSize = 16.sp))
+            val highTempLayout = tempLayouts[index].high
 
             point.highTempRegion = Region(
                 point.xPosition - highTempLayout.size.width/2,
@@ -244,8 +359,7 @@ private fun calculateElementRegions(
                 point.highYPosition - halfIconSize - 4.dp.toPx()
             )
 
-            val lowTempText = toFahrenheitAware(point.lowTemp, unit).toString() + "°"
-            val lowTempLayout = textMeasurer.measure(lowTempText, style = TextStyle(fontSize = 16.sp))
+            val lowTempLayout = tempLayouts[index].low
 
             point.lowTempRegion = Region(
                 point.xPosition - lowTempLayout.size.width/2,
@@ -253,6 +367,43 @@ private fun calculateElementRegions(
                 point.xPosition + lowTempLayout.size.width/2,
                 point.lowYPosition + halfIconSize + lowTempLayout.size.height + 4.dp.toPx()
             )
+        }
+    }
+}
+
+private fun buildLinePaths(
+    points: List<ForecastPoint>,
+    isHighTemp: Boolean,
+    gapRadius: Float
+): List<Path> {
+    if (points.size < 2) return emptyList()
+    return buildList {
+        for (i in 0 until points.size - 1) {
+            val startPoint = points[i]
+            val endPoint = points[i + 1]
+            val startY = if (isHighTemp) startPoint.highYPosition else startPoint.lowYPosition
+            val endY = if (isHighTemp) endPoint.highYPosition else endPoint.lowYPosition
+            val startX = startPoint.xPosition
+            val endX = endPoint.xPosition
+            val goingRight = startX < endX
+            val adjustedStartX = if (goingRight) startX + gapRadius else startX - gapRadius
+            val adjustedEndX = if (goingRight) endX - gapRadius else endX + gapRadius
+
+            if ((goingRight && adjustedStartX >= adjustedEndX) ||
+                (!goingRight && adjustedStartX <= adjustedEndX)
+            ) {
+                continue
+            }
+
+            add(Path().apply {
+                moveTo(adjustedStartX, startY)
+                val midX = (adjustedStartX + adjustedEndX) / 2
+                cubicTo(
+                    x1 = midX, y1 = startY,
+                    x2 = midX, y2 = endY,
+                    x3 = adjustedEndX, y3 = endY
+                )
+            })
         }
     }
 }
@@ -273,91 +424,35 @@ private fun DrawScope.drawWeatherIcon(
 }
 
 private fun DrawScope.drawTemperatureLines(
-    points: List<ForecastPoint>,
+    highLinePaths: List<Path>,
+    lowLinePaths: List<Path>,
     highColor: Color,
     lowColor: Color,
-    progress: Float,
-    iconSize: Float
+    progress: Float
 ) {
-    val gapRadius = iconSize / 2 + 4.dp.toPx()
-
-    for (i in 0 until points.size - 1) {
-        drawCenteredLineSegment(
-            startPoint = points[i],
-            endPoint = points[i+1],
-            isHighTemp = true,
-            color = highColor,
-            progress = progress,
-            gapRadius = gapRadius
-        )
-    }
-
-    for (i in 0 until points.size - 1) {
-        drawCenteredLineSegment(
-            startPoint = points[i],
-            endPoint = points[i+1],
-            isHighTemp = false,
-            color = lowColor,
-            progress = progress,
-            gapRadius = gapRadius
-        )
-    }
+    drawPathSegments(paths = highLinePaths, color = highColor, progress = progress)
+    drawPathSegments(paths = lowLinePaths, color = lowColor, progress = progress)
 }
 
-private fun DrawScope.drawCenteredLineSegment(
-    startPoint: ForecastPoint,
-    endPoint: ForecastPoint,
-    isHighTemp: Boolean,
+private fun DrawScope.drawPathSegments(
+    paths: List<Path>,
     color: Color,
-    progress: Float,
-    gapRadius: Float
+    progress: Float
 ) {
-    val startY = if (isHighTemp) startPoint.highYPosition else startPoint.lowYPosition
-    val endY = if (isHighTemp) endPoint.highYPosition else endPoint.lowYPosition
-
-    val startX = startPoint.xPosition
-    val endX = endPoint.xPosition
-
-    val goingRight = startX < endX
-
-    val adjustedStartX = if (goingRight) startX + gapRadius else startX - gapRadius
-    val adjustedEndX = if (goingRight) endX - gapRadius else endX + gapRadius
-
-    if ((goingRight && adjustedStartX >= adjustedEndX) ||
-        (!goingRight && adjustedStartX <= adjustedEndX)) {
-        return
-    }
-
-    val path = Path().apply {
-        moveTo(adjustedStartX, startY)
-
-        val midX = (adjustedStartX + adjustedEndX) / 2
-
-        cubicTo(
-            x1 = midX, y1 = startY,
-            x2 = midX, y2 = endY,
-            x3 = adjustedEndX, y3 = endY
-        )
-    }
-
+    val stroke = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
     if (progress >= 1f) {
-        drawPath(
-            path = path,
-            color = color,
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-        )
+        paths.forEach { path ->
+            drawPath(path = path, color = color, style = stroke)
+        }
     } else {
         val segmentProgress = progress.coerceIn(0f, 1f)
         val pathMeasure = PathMeasure()
-        val animatedPath = Path()
-        pathMeasure.setPath(path, false)
-        pathMeasure.getSegment(0f, pathMeasure.length * segmentProgress, animatedPath, true)
-
-        drawPath(
-            path = animatedPath,
-            color = color,
-            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
-        )
+        paths.forEach { path ->
+            val animatedPath = Path()
+            pathMeasure.setPath(path, false)
+            pathMeasure.getSegment(0f, pathMeasure.length * segmentProgress, animatedPath, true)
+            drawPath(path = animatedPath, color = color, style = stroke)
+        }
     }
 }
 
@@ -405,53 +500,29 @@ private fun DrawScope.drawGridLines(
 
 private fun DrawScope.drawLabels(
     points: List<ForecastPoint>,
-    textMeasurer: TextMeasurer,
-    unit: TemperatureUnit,
+    labelLayouts: List<LabelLayouts>,
     size: Size
 ) {
-    val onSurfaceColor = Color.White
-    val onSurfaceVariantColor = OnSurfaceVariant
-    val isTodayColor = Color(0xFFFF6F6F)
-
-    points.forEach { point ->
-        val highTempText = toFahrenheitAware(point.highTemp, unit).toString()
-        val highTempStyle = TextStyle(
-            fontSize = 16.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = onSurfaceColor
-        )
-        val highTempLayout = textMeasurer.measure(highTempText, style = highTempStyle)
-        val degreeSymbolLayout = textMeasurer.measure("°", style = highTempStyle)
+    points.forEachIndexed { index, point ->
+        val layouts = labelLayouts[index]
+        val highTempLayout = layouts.highTemp
+        val degreeSymbolLayout = layouts.highDegree
 
         val highTempX = point.xPosition - highTempLayout.size.width / 2
         val highTempY = point.highYPosition - highTempLayout.size.height - 18.dp.toPx()
         drawText(highTempLayout, topLeft = Offset(highTempX, highTempY))
         drawText(degreeSymbolLayout, topLeft = Offset(highTempX + highTempLayout.size.width, highTempY))
 
-        val lowTempText = toFahrenheitAware(point.lowTemp, unit).toString()
-        val lowTempStyle = highTempStyle.copy(color = onSurfaceColor)
-        val lowTempLayout = textMeasurer.measure(lowTempText, style = lowTempStyle)
-        val lowDegreeLayout = textMeasurer.measure("°", style = lowTempStyle)
+        val lowTempLayout = layouts.lowTemp
+        val lowDegreeLayout = layouts.lowDegree
 
         val lowTempX = point.xPosition - lowTempLayout.size.width / 2
         val lowTempY = point.lowYPosition + 15.dp.toPx()
         drawText(lowTempLayout, topLeft = Offset(lowTempX, lowTempY))
         drawText(lowDegreeLayout, topLeft = Offset(lowTempX + lowTempLayout.size.width, lowTempY))
 
-        var dayOfWeekText = point.date.dayOfWeek.getDisplayName(
-            JavaTextStyle.SHORT,
-            Locale.forLanguageTag("pl")
-        ).replaceFirstChar { it.titlecase(Locale.forLanguageTag("pl")) }
-
-        if (dayOfWeekText == "Niedz.") dayOfWeekText = "Ndz."
-        val dayOfWeekTextNoDot = dayOfWeekText.removeSuffix(".")
-        val dot = if (dayOfWeekText.endsWith(".")) "." else ""
-        val isToday = point.date == LocalDate.now()
-
-        val dayColor = if (isToday) isTodayColor else onSurfaceVariantColor
-        val dayStyle = TextStyle(color = dayColor, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-        val dayLayout = textMeasurer.measure(dayOfWeekTextNoDot, style = dayStyle)
-        val dotLayout = if (dot.isNotEmpty()) textMeasurer.measure(dot, style = dayStyle) else null
+        val dayLayout = layouts.day
+        val dotLayout = layouts.dot
 
         val dayX = point.xPosition - dayLayout.size.width / 2
         val dayY = size.height - 50.dp.toPx()
@@ -461,16 +532,68 @@ private fun DrawScope.drawLabels(
             drawText(dotLayout, topLeft = Offset(dayX + dayLayout.size.width, dayY))
         }
 
-        val dayOfMonthText = point.date.dayOfMonth.toString()
-        val dayOfMonthLayout = textMeasurer.measure(
-            dayOfMonthText,
-            style = TextStyle(color = onSurfaceVariantColor, fontSize = 14.sp)
-        )
+        val dayOfMonthLayout = layouts.dayOfMonth
 
         drawText(
             dayOfMonthLayout,
             topLeft = Offset(point.xPosition - dayOfMonthLayout.size.width / 2, size.height - 32.dp.toPx())
         )
+    }
+}
+
+private fun DrawScope.drawGridLinesWithProgress(
+    points: List<ForecastPoint>,
+    yTop: Float,
+    yBottom: Float,
+    progress: Float
+) {
+    if (progress >= 1f) {
+        drawGridLines(points, yTop, yBottom)
+        return
+    }
+
+    val lineAlpha = 0.3f
+    val lineWidth = 1.dp.toPx()
+    val gapBuffer = 3.dp.toPx()
+
+    points.forEach { point ->
+        val sortedObstacles = listOf(
+            point.highTempRegion,
+            point.highIconRegion,
+            point.lowIconRegion,
+            point.lowTempRegion
+        ).sortedBy { it.top }
+
+        var currentY = yTop
+
+        for (obstacle in sortedObstacles) {
+            if (obstacle.top - gapBuffer > currentY) {
+                val segmentStart = currentY
+                val segmentEnd = obstacle.top - gapBuffer
+                val animatedEnd = segmentStart + (segmentEnd - segmentStart) * progress
+                if (animatedEnd > segmentStart) {
+                    drawLine(
+                        color = OnSurfaceVariant.copy(alpha = lineAlpha),
+                        start = Offset(point.xPosition, segmentStart),
+                        end = Offset(point.xPosition, animatedEnd),
+                        strokeWidth = lineWidth
+                    )
+                }
+            }
+            currentY = obstacle.bottom + gapBuffer
+        }
+
+        if (yBottom > currentY) {
+            val animatedEnd = currentY + (yBottom - currentY) * progress
+            if (animatedEnd > currentY) {
+                drawLine(
+                    color = OnSurfaceVariant.copy(alpha = lineAlpha),
+                    start = Offset(point.xPosition, currentY),
+                    end = Offset(point.xPosition, animatedEnd),
+                    strokeWidth = lineWidth
+                )
+            }
+        }
     }
 }
 

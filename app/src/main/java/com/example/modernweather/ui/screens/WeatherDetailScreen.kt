@@ -4,6 +4,7 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -89,29 +90,46 @@ fun WeatherDetailScreen(
 @Composable
 fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherViewModel, onNavigateToRadar: () -> Unit) {
     val stableSunInfo = remember(data.location.id) { data.sunInfo }
-    val nowcastAssessment by viewModel.nowcastAssessmentState.collectAsState()
+    val listState = rememberLazyListState()
+    val isCurrentWeatherVisible by remember {
+        derivedStateOf {
+            listState.layoutInfo.visibleItemsInfo.any { it.key == "current_weather" }
+        }
+    }
+    val isListScrolling by remember {
+        derivedStateOf { listState.isScrollInProgress }
+    }
+    val shouldRunHeavyEffects by remember {
+        derivedStateOf { isCurrentWeatherVisible && !isListScrolling }
+    }
 
-    // Use derivedStateOf to avoid recomposition when scrolling
     val stableHourlyForecast = remember(data.hourlyForecast) { data.hourlyForecast }
     val stableDailyForecast = remember(data.dailyForecast) { data.dailyForecast }
     val stableDetails = remember(data.weatherDetails) { data.weatherDetails }
+    val stableCurrentWeather = remember(data.currentWeather) { data.currentWeather }
 
     LazyColumn(
+        state = listState,
         contentPadding = PaddingValues(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item(key = "current_weather") {
-            CurrentWeatherSection(current = data.currentWeather, hourly = stableHourlyForecast, unit = unit)
+        item(key = "current_weather", contentType = "current_weather") {
+            CurrentWeatherSection(
+                current = stableCurrentWeather,
+                hourly = stableHourlyForecast,
+                unit = unit,
+                pauseEffects = !shouldRunHeavyEffects
+            )
         }
 
         data.alert?.let { alert ->
-            item(key = "alert_${alert.id}") {
+            item(key = "alert_${alert.id}", contentType = "alert") {
                 AlertCard(alert)
             }
         }
 
 
-        item(key = "weekly_forecast") {
+        item(key = "weekly_forecast", contentType = "weekly_chart") {
             TitledCard("PROGNOZA TYGODNIOWA") {
                 WeeklyForecastChart(
                     modifier = Modifier
@@ -123,25 +141,31 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
             }
         }
 
-        item(key = "details_aqi") {
+        item(key = "details_aqi", contentType = "details") {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 DetailsGrid(details = stableDetails)
                 AqiSection(details = stableDetails)
             }
         }
 
-        item(key = "local_nowcast_status") {
-            LocalNowcastCard(assessment = nowcastAssessment)
+        item(key = "local_nowcast_status", contentType = "nowcast") {
+            LocalNowcastCardItem(viewModel = viewModel)
         }
 
-        item(key = "radar") {
+        item(key = "radar", contentType = "radar") {
             RadarCard(onClick = onNavigateToRadar)
         }
 
-        item(key = "sun_cycle") {
+        item(key = "sun_cycle", contentType = "sun_cycle") {
             SunCycleSection(sunInfo = stableSunInfo, viewModel = viewModel)
         }
     }
+}
+
+@Composable
+private fun LocalNowcastCardItem(viewModel: WeatherViewModel) {
+    val nowcastAssessment by viewModel.nowcastAssessmentState.collectAsState()
+    LocalNowcastCard(assessment = nowcastAssessment)
 }
 
 @Composable

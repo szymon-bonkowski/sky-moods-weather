@@ -4,6 +4,9 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -46,7 +49,12 @@ import kotlin.math.max
 import kotlin.random.Random
 
 @Composable
-fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>, unit: TemperatureUnit) {
+fun CurrentWeatherSection(
+    current: CurrentWeather,
+    hourly: List<HourlyForecast>,
+    unit: TemperatureUnit,
+    pauseEffects: Boolean = false
+) {
     val displayTemp = if (unit == TemperatureUnit.CELSIUS) current.temperature else toFahrenheit(current.temperature)
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
@@ -55,7 +63,7 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.TopCenter
     ) {
-        WeatherParticleSystem(condition = current.conditionEnum)
+        WeatherParticleSystem(condition = current.conditionEnum, enabled = !pauseEffects)
 
         Column(
             modifier = Modifier.padding(top = 0.dp, bottom = 4.dp),
@@ -158,15 +166,16 @@ fun CurrentWeatherSection(current: CurrentWeather, hourly: List<HourlyForecast>,
 private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: TemperatureUnit) {
     if (hourlyForecast.isEmpty()) return
 
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
     val currentHourIndex = remember(hourlyForecast) {
         val now = java.time.LocalTime.now().hour
         hourlyForecast.indexOfFirst { it.time.hour == now }.coerceAtLeast(0)
     }
 
-    val scrollState = rememberScrollState()
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentHourIndex)
     
     LaunchedEffect(currentHourIndex) {
-        scrollState.scrollTo((currentHourIndex * 64 * 2.5).toInt())
+        listState.scrollToItem(currentHourIndex)
     }
 
     val chartShape = RoundedCornerShape(24.dp)
@@ -190,15 +199,19 @@ private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: Tempera
                 shape = chartShape
             )
     ) {
-        Row(
+        LazyRow(
             modifier = Modifier
                 .fillMaxSize()
-                .horizontalScroll(scrollState)
                 .padding(horizontal = 16.dp),
+            state = listState,
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            hourlyForecast.forEach { forecast ->
+            items(
+                items = hourlyForecast,
+                key = { forecast -> forecast.time.toString() },
+                contentType = { "hourly-item" }
+            ) { forecast ->
                 val displayTemp = if (unit == TemperatureUnit.CELSIUS) forecast.temperature else toFahrenheit(forecast.temperature)
                 
                 Column(
@@ -207,7 +220,7 @@ private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: Tempera
                     modifier = Modifier.width(48.dp)
                 ) {
                     Text(
-                        text = forecast.time.format(java.time.format.DateTimeFormatter.ofPattern("HH:mm")),
+                        text = forecast.time.format(timeFormatter),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -275,10 +288,8 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
     val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     val pointFillColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
 
-    val iconPainters = remember(hourlyForecast) {
-        hourlyForecast.map {
-            painterResource(id = weatherConditionIconRes(it.conditionEnum))
-        }
+    val iconPainters = hourlyForecast.map { forecast ->
+        painterResource(id = weatherConditionIconRes(forecast.conditionEnum))
     }
 
     val tempTextLayouts = remember(hourlyForecast, unit, tempTextStyle) {
@@ -498,7 +509,7 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
 }
 
 @Composable
-fun WeatherParticleSystem(condition: WeatherCondition) {
+fun WeatherParticleSystem(condition: WeatherCondition, enabled: Boolean = true) {
     val particles = remember { mutableStateListOf<Particle>() }
     val particlePool = remember { mutableListOf<Particle>() }
     val isRainOrSnow = remember(condition) {
@@ -509,7 +520,13 @@ fun WeatherParticleSystem(condition: WeatherCondition) {
         )
     }
 
-    if (isRainOrSnow) {
+    LaunchedEffect(enabled) {
+        if (!enabled) {
+            particles.clear()
+        }
+    }
+
+    if (isRainOrSnow && enabled) {
         LaunchedEffect(condition) {
             val isSnow = condition == WeatherCondition.DAY_SNOW || condition == WeatherCondition.NIGHT_SNOW
             while (isActive) {
