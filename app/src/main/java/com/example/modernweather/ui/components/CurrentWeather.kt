@@ -167,15 +167,22 @@ private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: Tempera
     if (hourlyForecast.isEmpty()) return
 
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val now = remember { java.time.LocalTime.now() }
     val currentHourIndex = remember(hourlyForecast) {
-        val now = java.time.LocalTime.now().hour
-        hourlyForecast.indexOfFirst { it.time.hour == now }.coerceAtLeast(0)
+        val index = hourlyForecast.indexOfFirst { it.time.hour == now.hour }
+        if (index >= 0) index else 0
     }
 
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentHourIndex)
     
     LaunchedEffect(currentHourIndex) {
         listState.scrollToItem(currentHourIndex)
+    }
+
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress && listState.firstVisibleItemIndex < currentHourIndex) {
+            listState.animateScrollToItem(currentHourIndex)
+        }
     }
 
     val chartShape = RoundedCornerShape(24.dp)
@@ -213,16 +220,27 @@ private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: Tempera
                 contentType = { "hourly-item" }
             ) { forecast ->
                 val displayTemp = if (unit == TemperatureUnit.CELSIUS) forecast.temperature else toFahrenheit(forecast.temperature)
+                val isNow = forecast.time.hour == now.hour
                 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier.width(48.dp)
+                    modifier = Modifier
+                        .width(52.dp)
+                        .then(
+                            if (isNow) {
+                                Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                                    .padding(vertical = 4.dp)
+                            } else Modifier
+                        )
                 ) {
                     Text(
-                        text = forecast.time.format(timeFormatter),
+                        text = if (isNow) "Teraz" else forecast.time.format(timeFormatter),
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (isNow) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal
                     )
                     
                     Image(

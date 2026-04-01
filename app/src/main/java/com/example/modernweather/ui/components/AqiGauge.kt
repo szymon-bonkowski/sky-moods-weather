@@ -21,6 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import com.example.modernweather.ui.theme.*
 
 @Composable
@@ -28,19 +32,23 @@ fun AqiGauge(
     aqi: Int,
     modifier: Modifier = Modifier,
     size: Dp = 120.dp,
-    verticalOffset: Dp = 10.dp
+    verticalOffset: Dp = 10.dp,
+    externalPlayed: Boolean? = null
 ) {
-    var animationPlayed by rememberSaveable {
+    var isVisible by remember { mutableStateOf(false) }
+    var internalAnimationPlayed by rememberSaveable(aqi) {
         mutableStateOf(false)
     }
+
+    val animationPlayed = externalPlayed ?: internalAnimationPlayed
 
     val maxAqi = 300f
     val targetSweepAngle = (240f * (aqi / maxAqi)).coerceIn(0f, 240f)
     val animationDuration = 1500
 
-    LaunchedEffect(Unit) {
-        if (!animationPlayed) {
-            animationPlayed = true
+    LaunchedEffect(isVisible) {
+        if (isVisible && !internalAnimationPlayed) {
+            internalAnimationPlayed = true
         }
     }
 
@@ -68,11 +76,22 @@ fun AqiGauge(
     }
 
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
 
     Box(
         modifier = modifier
             .size(size)
-            .offset(y = verticalOffset),
+            .offset(y = verticalOffset)
+            .onGloballyPositioned { coordinates ->
+                if (!animationPlayed) {
+                    val yPosition = coordinates.positionInWindow().y
+                    if (yPosition > 0 && yPosition < screenHeightPx) {
+                        isVisible = true
+                    }
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
 

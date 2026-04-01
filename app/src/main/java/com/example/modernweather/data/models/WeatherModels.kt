@@ -96,7 +96,10 @@ data class WeatherDetails(
     val uvIndex: Int,
     val visibility: String,
     val cloudCover: Int,
-    val airQualityIndex: Int
+    val airQualityIndex: Int,
+    val pm25: Float,
+    val pm10: Float,
+    val no2: Float
 )
 
 @Immutable

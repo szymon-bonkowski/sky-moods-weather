@@ -10,6 +10,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -117,13 +118,20 @@ fun WeeklyForecastChart(
         }
     }
 
+    val animationPlayed = rememberSaveable(forecastKey) {
+        mutableStateOf(false)
+    }
+
     val animationProgress = remember(forecastKey) {
-        Animatable(0f)
+        Animatable(if (animationPlayed.value) 1f else 0f)
     }
 
     LaunchedEffect(forecastKey) {
-        animationProgress.snapTo(0f)
-        animationProgress.animateTo(1f, animationSpec = tween(durationMillis = 1500))
+        if (!animationPlayed.value) {
+            animationProgress.snapTo(0f)
+            animationProgress.animateTo(1f, animationSpec = tween(durationMillis = 1500))
+            animationPlayed.value = true
+        }
     }
 
     val regionTempLayouts = remember(dailyForecasts, unit, textMeasurer) {
@@ -245,11 +253,10 @@ fun WeeklyForecastChart(
             .onSizeChanged { canvasSize = it }
     ) {
         val layoutData = chartLayoutData ?: return@Canvas
-        drawGridLinesWithProgress(
+        drawGridLines(
             points = layoutData.points,
             yTop = layoutData.yTopPadding,
-            yBottom = layoutData.yBottom,
-            progress = animationProgress.value
+            yBottom = layoutData.yBottom
         )
         drawTemperatureLines(
             highLinePaths = layoutData.highLinePaths,
@@ -538,62 +545,6 @@ private fun DrawScope.drawLabels(
             dayOfMonthLayout,
             topLeft = Offset(point.xPosition - dayOfMonthLayout.size.width / 2, size.height - 32.dp.toPx())
         )
-    }
-}
-
-private fun DrawScope.drawGridLinesWithProgress(
-    points: List<ForecastPoint>,
-    yTop: Float,
-    yBottom: Float,
-    progress: Float
-) {
-    if (progress >= 1f) {
-        drawGridLines(points, yTop, yBottom)
-        return
-    }
-
-    val lineAlpha = 0.3f
-    val lineWidth = 1.dp.toPx()
-    val gapBuffer = 3.dp.toPx()
-
-    points.forEach { point ->
-        val sortedObstacles = listOf(
-            point.highTempRegion,
-            point.highIconRegion,
-            point.lowIconRegion,
-            point.lowTempRegion
-        ).sortedBy { it.top }
-
-        var currentY = yTop
-
-        for (obstacle in sortedObstacles) {
-            if (obstacle.top - gapBuffer > currentY) {
-                val segmentStart = currentY
-                val segmentEnd = obstacle.top - gapBuffer
-                val animatedEnd = segmentStart + (segmentEnd - segmentStart) * progress
-                if (animatedEnd > segmentStart) {
-                    drawLine(
-                        color = OnSurfaceVariant.copy(alpha = lineAlpha),
-                        start = Offset(point.xPosition, segmentStart),
-                        end = Offset(point.xPosition, animatedEnd),
-                        strokeWidth = lineWidth
-                    )
-                }
-            }
-            currentY = obstacle.bottom + gapBuffer
-        }
-
-        if (yBottom > currentY) {
-            val animatedEnd = currentY + (yBottom - currentY) * progress
-            if (animatedEnd > currentY) {
-                drawLine(
-                    color = OnSurfaceVariant.copy(alpha = lineAlpha),
-                    start = Offset(point.xPosition, currentY),
-                    end = Offset(point.xPosition, animatedEnd),
-                    strokeWidth = lineWidth
-                )
-            }
-        }
     }
 }
 

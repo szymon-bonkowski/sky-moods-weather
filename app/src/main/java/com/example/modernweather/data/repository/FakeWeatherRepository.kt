@@ -114,7 +114,10 @@ class FakeWeatherRepository : WeatherRepository {
                 uvIndex = if (now.hour in 8..18) 4 else 0,
                 visibility = "17 km",
                 cloudCover = 75,
-                airQualityIndex = 41
+                airQualityIndex = 41,
+                pm25 = 12.5f,
+                pm10 = 24.3f,
+                no2 = 18.7f
             ),
             sunInfo = SunInfo(
                 sunrise = testSunrise ?: LocalTime.of(4, 20),

@@ -1,6 +1,8 @@
 package com.example.modernweather.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,12 +13,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -30,6 +37,7 @@ import com.example.modernweather.data.models.*
 import com.example.modernweather.nowcast.model.LocalRiskLevel
 import com.example.modernweather.nowcast.model.NowcastAssessment
 import com.example.modernweather.ui.components.*
+import com.example.modernweather.ui.theme.*
 import com.example.modernweather.ui.viewmodel.*
 
 fun toFahrenheit(celsius: Int): Int {
@@ -299,16 +307,109 @@ fun DetailItem(label: String, value: String, icon: ImageVector, modifier: Modifi
 
 @Composable
 fun AqiSection(details: WeatherDetails) {
+    var isVisible by remember { mutableStateOf(false) }
+    var animationPlayed by rememberSaveable(details.airQualityIndex) {
+        mutableStateOf(false)
+    }
+
+    val density = LocalDensity.current
+    val configuration = LocalConfiguration.current
+    val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }
+
+    LaunchedEffect(isVisible) {
+        if (isVisible && !animationPlayed) {
+            animationPlayed = true
+        }
+    }
+
     TitledCard(title = "JAKOŚĆ POWIETRZA") {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(150.dp)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(horizontal = 16.dp, vertical = 20.dp)
+                .onGloballyPositioned { coordinates ->
+                    if (!animationPlayed) {
+                        val yPosition = coordinates.positionInWindow().y
+                        if (yPosition > 0 && yPosition < screenHeightPx) {
+                            isVisible = true
+                        }
+                    }
+                },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            AqiGauge(aqi = details.airQualityIndex)
+            Box(
+                modifier = Modifier.weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                AqiGauge(
+                    aqi = details.airQualityIndex,
+                    size = 110.dp,
+                    externalPlayed = animationPlayed
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1.2f),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                AqiComponentRow("PM2.5", details.pm25, 25f, animationPlayed)
+                AqiComponentRow("PM10", details.pm10, 50f, animationPlayed)
+                AqiComponentRow("NO₂", details.no2, 40f, animationPlayed)
+            }
+        }
+    }
+}
+
+@Composable
+fun AqiComponentRow(label: String, value: Float, maxValue: Float, animate: Boolean) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = "${value.toInt()} µg/m³",
+                style = MaterialTheme.typography.bodySmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        
+        val targetProgress = (value / (maxValue * 1.5f)).coerceIn(0.05f, 1f)
+        val progress by animateFloatAsState(
+            targetValue = if (animate) targetProgress else 0.05f,
+            animationSpec = tween(durationMillis = 1500),
+            label = "aqi_bar_$label"
+        )
+
+        val barColor = when {
+            value <= maxValue * 0.5f -> AqiGood
+            value <= maxValue -> AqiModerate
+            value <= maxValue * 1.5f -> AqiUnhealthy
+            else -> AqiVeryUnhealthy
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(6.dp)
+                .clip(RoundedCornerShape(3.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(progress)
+                    .fillMaxHeight()
+                    .background(barColor)
+            )
         }
     }
 }
