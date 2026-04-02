@@ -7,10 +7,16 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.filled.Grass
+import androidx.compose.material.icons.filled.Nature
+import androidx.compose.material.icons.filled.Park
+import androidx.compose.material.icons.filled.Eco
+import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -35,6 +41,7 @@ import androidx.compose.ui.unit.sp
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import com.example.modernweather.R
 import com.example.modernweather.data.models.*
 import com.example.modernweather.nowcast.model.LocalRiskLevel
@@ -75,7 +82,7 @@ fun WeatherDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wróć")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -155,7 +162,7 @@ fun WeatherPage(
 
 
         item(key = "weekly_forecast", contentType = "weekly_chart") {
-            TitledCard("PROGNOZA TYGODNIOWA") {
+            TitledCard(stringResource(R.string.weather_detail_weekly_forecast)) {
                 WeeklyForecastChart(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -170,6 +177,7 @@ fun WeatherPage(
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 DetailsGrid(details = stableDetails)
                 AqiSection(details = stableDetails)
+                AllergiesSection(details = stableDetails)
             }
         }
 
@@ -198,13 +206,13 @@ private fun LocalNowcastCardItem(viewModel: WeatherViewModel) {
 @Composable
 fun LocalNowcastCard(assessment: NowcastAssessment) {
     val (title, color) = when (assessment.riskLevel) {
-        LocalRiskLevel.LOW -> "Niskie ryzyko nagłej burzy/frontu" to Color(0xFF4CAF50)
-        LocalRiskLevel.ELEVATED -> "Podwyższone ryzyko zmian pogodowych" to Color(0xFFFFB300)
-        LocalRiskLevel.HIGH -> "Wysokie ryzyko gwałtownego załamania pogody" to Color(0xFFFF7043)
-        LocalRiskLevel.SEVERE -> "Bardzo wysokie ryzyko burzy/silnego wiatru" to Color(0xFFE53935)
+        LocalRiskLevel.LOW -> stringResource(R.string.local_nowcast_risk_low) to Color(0xFF4CAF50)
+        LocalRiskLevel.ELEVATED -> stringResource(R.string.local_nowcast_risk_elevated) to Color(0xFFFFB300)
+        LocalRiskLevel.HIGH -> stringResource(R.string.local_nowcast_risk_high) to Color(0xFFFF7043)
+        LocalRiskLevel.SEVERE -> stringResource(R.string.local_nowcast_risk_severe) to Color(0xFFE53935)
     }
 
-    TitledCard("BAROMETR TELEFONU") {
+    TitledCard(stringResource(R.string.weather_detail_phone_barometer)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -219,7 +227,11 @@ fun LocalNowcastCard(assessment: NowcastAssessment) {
             )
             assessment.latestPressureHpa?.let {
                 Text(
-                    text = "Ciśnienie: ${"%.1f".format(it)} hPa | Spadek 3h: ${"%.1f".format(assessment.pressureDrop3h)} hPa",
+                    text = stringResource(
+                        R.string.weather_detail_pressure_drop_format,
+                        "%.1f".format(it),
+                        "%.1f".format(assessment.pressureDrop3h)
+                    ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -282,27 +294,27 @@ fun ErrorState(message: String) {
 
 @Composable
 fun DetailsGrid(details: WeatherDetails) {
-    TitledCard(title = "SZCZEGÓŁY") {
+    TitledCard(title = stringResource(R.string.weather_detail_details_section)) {
         Column(
             modifier = Modifier
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Row(Modifier.fillMaxWidth()) {
-                DetailItem("Wiatr", "${details.windSpeed} km/h", Icons.Default.Air, Modifier.weight(1f))
-                DetailItem("Ciśnienie", "${details.pressure} hPa", Icons.Default.Speed, Modifier.weight(1f))
+                DetailItem(stringResource(R.string.weather_detail_wind_label), "${details.windSpeed} km/h", Icons.Default.Air, Modifier.weight(1f))
+                DetailItem(stringResource(R.string.weather_detail_pressure_label), "${details.pressure} hPa", Icons.Default.Speed, Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth()) {
-                DetailItem("Wilgotność", "${details.humidity}%", Icons.Default.WaterDrop, Modifier.weight(1f))
-                DetailItem("Indeks UV", "${details.uvIndex}", Icons.Default.WbSunny, Modifier.weight(1f))
+                DetailItem(stringResource(R.string.weather_detail_humidity_label), "${details.humidity}%", Icons.Default.WaterDrop, Modifier.weight(1f))
+                DetailItem(stringResource(R.string.weather_detail_uv_label), "${details.uvIndex}", Icons.Default.WbSunny, Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth()) {
-                DetailItem("Zachmurzenie", "${details.cloudCover}%", Icons.Default.Cloud, Modifier.weight(1f))
-                DetailItem("Widoczność", details.visibility, Icons.Default.Visibility, Modifier.weight(1f))
+                DetailItem(stringResource(R.string.weather_detail_cloud_cover_label), "${details.cloudCover}%", Icons.Default.Cloud, Modifier.weight(1f))
+                DetailItem(stringResource(R.string.weather_detail_visibility_label), details.visibility, Icons.Default.Visibility, Modifier.weight(1f))
             }
             Row(Modifier.fillMaxWidth()) {
-                DetailItem("Opady", "${details.precipitation} mm", Icons.Default.Water, Modifier.weight(1f))
-                DetailItem("Punkt rosy", "${details.dewPoint}°", Icons.Default.Thermostat, Modifier.weight(1f))
+                DetailItem(stringResource(R.string.weather_detail_precipitation_label), "${details.precipitation} mm", Icons.Default.Water, Modifier.weight(1f))
+                DetailItem(stringResource(R.string.weather_detail_dew_point_label), "${details.dewPoint}°", Icons.Default.Thermostat, Modifier.weight(1f))
             }
         }
     }
@@ -345,7 +357,7 @@ fun AqiSection(details: WeatherDetails) {
         }
     }
 
-    TitledCard(title = "JAKOŚĆ POWIETRZA") {
+    TitledCard(title = stringResource(R.string.weather_detail_air_quality_section)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -438,9 +450,110 @@ fun AqiComponentRow(label: String, value: Float, maxValue: Float, animate: Boole
 }
 
 @Composable
+fun AllergiesSection(details: WeatherDetails) {
+    TitledCard(title = stringResource(R.string.weather_detail_allergies_section)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            AllergyItem(stringResource(R.string.weather_detail_grass_label), details.grassPollen, Icons.Default.Grass, Modifier.weight(1f))
+            AllergyItem(stringResource(R.string.weather_detail_trees_label), details.treePollen, Icons.Default.Park, Modifier.weight(1f))
+            AllergyItem(stringResource(R.string.weather_detail_ragweed_label), details.ragweedPollen, Icons.Default.Eco, Modifier.weight(1f))
+        }
+    }
+}
+
+@Composable
+fun AllergyItem(label: String, level: PollenLevel, icon: ImageVector, modifier: Modifier = Modifier) {
+    val (levelText, color) = when (level) {
+        PollenLevel.NONE -> stringResource(R.string.pollen_level_none) to AccentGreen
+        PollenLevel.LOW -> stringResource(R.string.pollen_level_low) to AccentGreen
+        PollenLevel.MEDIUM -> stringResource(R.string.pollen_level_medium) to AccentYellow
+        PollenLevel.HIGH -> stringResource(R.string.pollen_level_high) to AccentRed
+        PollenLevel.VERY_HIGH -> stringResource(R.string.pollen_level_very_high) to AccentRed
+    }
+
+    val totalSegments = 4
+    val filledSegments = when (level) {
+        PollenLevel.NONE -> 0
+        PollenLevel.LOW -> 1
+        PollenLevel.MEDIUM -> 2
+        PollenLevel.HIGH -> 3
+        PollenLevel.VERY_HIGH -> 4
+    }
+
+    Box(
+        modifier = modifier
+            .height(140.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.04f))
+            .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f), RoundedCornerShape(20.dp))
+            .padding(12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .background(color.copy(alpha = 0.12f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = color,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+            
+            Text(
+                text = levelText,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = color,
+                textAlign = TextAlign.Center
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            Row(
+                modifier = Modifier.fillMaxWidth(0.9f),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                repeat(totalSegments) { index ->
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(
+                                if (index < filledSegments) color else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f)
+                            )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun RadarCard(onClick: () -> Unit) {
-    // TODO: replace this placeholder card when a real radar data source exists.
-    TitledCard(title = "RADAR (TODO)") {
+    TitledCard(title = stringResource(R.string.weather_detail_radar_section)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -451,7 +564,7 @@ fun RadarCard(onClick: () -> Unit) {
         ) {
             Image(
                 painter = painterResource(id = R.drawable.map_background),
-                contentDescription = "Radar preview",
+                contentDescription = stringResource(R.string.weather_detail_radar_preview_content_description),
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
@@ -463,7 +576,7 @@ fun RadarCard(onClick: () -> Unit) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Radar, contentDescription = null, tint = Color.White)
-                    Text("Placeholder", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.weather_detail_open_radar_map), color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -534,7 +647,7 @@ fun AlertCard(alert: WeatherAlert) {
                 )
                 Spacer(modifier = Modifier.height(10.dp))
                 Text(
-                    text = "Ważne do: ${alert.expirationTime}",
+                    text = stringResource(R.string.weather_detail_alert_expires_format, alert.expirationTime),
                     style = MaterialTheme.typography.labelMedium,
                     color = contentColor.copy(alpha = 0.75f)
                 )

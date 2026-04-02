@@ -1,15 +1,20 @@
 package com.example.modernweather.data.repository
 
+import android.content.Context
+import com.example.modernweather.R
 import com.example.modernweather.data.models.AlertSeverity
 import com.example.modernweather.data.models.CurrentWeather
 import com.example.modernweather.data.models.DailyForecast
 import com.example.modernweather.data.models.HourlyForecast
 import com.example.modernweather.data.models.Location
+import com.example.modernweather.data.models.PollenLevel
 import com.example.modernweather.data.models.SunInfo
 import com.example.modernweather.data.models.WeatherAlert
 import com.example.modernweather.data.models.WeatherCondition
 import com.example.modernweather.data.models.WeatherData
 import com.example.modernweather.data.models.WeatherDetails
+import com.example.modernweather.utils.WeatherTextFormatter
+import com.example.modernweather.utils.localized
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -25,10 +30,11 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
-class OpenMeteoWeatherRepository : WeatherRepository {
+class OpenMeteoWeatherRepository(
+    private val context: Context
+) : WeatherRepository {
 
     private data class LocationSpec(
         val id: String,
@@ -50,9 +56,9 @@ class OpenMeteoWeatherRepository : WeatherRepository {
     )
 
     private val locationSpecs = listOf(
-        LocationSpec(id = "warszawa", query = "Warszawa", isCurrentLocation = true),
-        LocationSpec(id = "krakow", query = "Kraków", isCurrentLocation = false),
-        LocationSpec(id = "gdansk", query = "Gdańsk", isCurrentLocation = false)
+        LocationSpec(id = "warszawa", query = "Warsaw", isCurrentLocation = true),
+        LocationSpec(id = "krakow", query = "Krakow", isCurrentLocation = false),
+        LocationSpec(id = "gdansk", query = "Gdansk", isCurrentLocation = false)
     )
 
     private val locationCache = ConcurrentHashMap<String, Location>()
@@ -60,41 +66,44 @@ class OpenMeteoWeatherRepository : WeatherRepository {
     @Volatile
     private var lastCurrentTime: LocalTime? = null
 
-    override fun getSavedLocations(): Flow<List<Location>> = flow {
-        emit(locationSpecs.map { resolveLocation(it) })
+    override fun getSavedLocations(languageTag: String?): Flow<List<Location>> = flow {
+        emit(locationSpecs.map { resolveLocation(it, languageTag) })
     }
 
-    override fun getWeatherData(locationId: String): Flow<WeatherData> = flow {
+    override fun getWeatherData(locationId: String, languageTag: String?): Flow<WeatherData> = flow {
         while (currentCoroutineContext().isActive) {
-            emit(fetchWeatherData(locationId))
+            emit(fetchWeatherData(locationId, languageTag))
             delay(15 * 60 * 1000L)
         }
     }
 
     override fun getCurrentTime(): LocalTime = lastCurrentTime ?: LocalTime.now()
 
-    private suspend fun resolveLocation(spec: LocationSpec): Location {
-        locationCache[spec.id]?.let { return it }
+    private suspend fun resolveLocation(spec: LocationSpec, languageTag: String?): Location {
+        val cacheKey = locationCacheKey(spec.id, languageTag)
+        locationCache[cacheKey]?.let { return it }
 
-        val geocoded = geocodeLocation(spec)
+        val geocoded = geocodeLocation(spec, languageTag)
         val location = Location(
             id = spec.id,
             name = geocoded.name,
             isCurrentLocation = spec.isCurrentLocation
         )
-        locationCache[spec.id] = location
-        geocodedCache[spec.id] = geocoded
+        locationCache[cacheKey] = location
+        geocodedCache[cacheKey] = geocoded
         return location
     }
 
-    private suspend fun fetchWeatherData(locationId: String): WeatherData {
+    private suspend fun fetchWeatherData(locationId: String, languageTag: String?): WeatherData {
         val spec = locationSpecs.firstOrNull { it.id == locationId }
             ?: throw IllegalArgumentException("Unknown Open-Meteo location ID: $locationId")
+        val cacheKey = locationCacheKey(spec.id, languageTag)
+        val localizedContext = context.localized(languageTag)
 
-        val geocoded = geocodedCache[spec.id] ?: geocodeLocation(spec).also {
-            geocodedCache[spec.id] = it
+        val geocoded = geocodedCache[cacheKey] ?: geocodeLocation(spec, languageTag).also {
+            geocodedCache[cacheKey] = it
         }
-        locationCache[spec.id] = Location(
+        locationCache[cacheKey] = Location(
             id = spec.id,
             name = geocoded.name,
             isCurrentLocation = spec.isCurrentLocation
@@ -154,35 +163,43 @@ class OpenMeteoWeatherRepository : WeatherRepository {
 
         val todayForecast = dailyForecast.firstOrNull() ?: throw IOException("Open-Meteo daily forecast was empty")
         val previousDayTemp = hourlyTemperatures.getOrNull((currentIndex - 24).coerceAtLeast(0))
-        val temperatureComparison = buildTemperatureComparison(
+        val temperatureComparison = WeatherTextFormatter.temperatureComparison(
+            context = localizedContext,
             currentTemperature = currentTemperature,
             referenceTemperature = previousDayTemp
         )
 
-        val pressureTrend = buildPressureTrend(
-            hourlyPressures = parseHourlyDoubles(hourly, "pressure_msl"),
-            currentIndex = currentIndex
+        val pressureTrend = WeatherTextFormatter.pressureTrend(
+            context = localizedContext,
+            diffHpa = buildPressureTrend(
+                hourlyPressures = parseHourlyDoubles(hourly, "pressure_msl"),
+                currentIndex = currentIndex
+            )
         )
 
         val weatherDetails = WeatherDetails(
             windSpeed = currentWindSpeed,
             windGusts = currentWindGusts,
-            windDirection = toWindDirectionLabel(currentWindDirection),
+            windDirection = WeatherTextFormatter.windDirection(localizedContext, currentWindDirection),
             humidity = currentHumidity,
             dewPoint = currentDewPoint,
             pressure = currentPressure,
             pressureTrend = pressureTrend,
             uvIndex = currentUvIndex,
-            visibility = formatVisibility(currentVisibilityMeters),
+            visibility = WeatherTextFormatter.visibility(localizedContext, currentVisibilityMeters),
             cloudCover = currentCloudCover,
             airQualityIndex = airQuality.currentAqi,
             pm25 = airQuality.currentPm25,
             pm10 = airQuality.currentPm10,
             no2 = airQuality.currentNo2,
-            precipitation = currentPrecipitation
+            precipitation = currentPrecipitation,
+            grassPollen = airQuality.grassPollen,
+            treePollen = airQuality.treePollen,
+            ragweedPollen = airQuality.ragweedPollen
         )
 
         val alert = buildWeatherAlert(
+            localizedContext = localizedContext,
             currentWeather = currentWeatherCondition,
             hourlyForecast = hourlyForecast,
             currentWindSpeed = currentWindSpeed,
@@ -191,7 +208,7 @@ class OpenMeteoWeatherRepository : WeatherRepository {
         )
 
         return WeatherData(
-            location = locationCache[spec.id] ?: Location(
+            location = locationCache[cacheKey] ?: Location(
                 id = spec.id,
                 name = geocoded.name,
                 isCurrentLocation = spec.isCurrentLocation
@@ -201,7 +218,7 @@ class OpenMeteoWeatherRepository : WeatherRepository {
                 feelsLike = currentFeelsLike,
                 highTemp = todayForecast.highTemp,
                 lowTemp = todayForecast.lowTemp,
-                condition = conditionLabel(currentWeatherCondition),
+                condition = WeatherTextFormatter.conditionLabel(localizedContext, currentWeatherCondition),
                 conditionEnum = currentWeatherCondition,
                 temperatureComparison = temperatureComparison
             ),
@@ -224,9 +241,10 @@ class OpenMeteoWeatherRepository : WeatherRepository {
             append("&current=temperature_2m,apparent_temperature,weather_code,relative_humidity_2m,dew_point_2m,pressure_msl,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,is_day,uv_index,precipitation")
             append("&hourly=temperature_2m,apparent_temperature,weather_code,precipitation_probability,relative_humidity_2m,dew_point_2m,pressure_msl,cloud_cover,visibility,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,is_day")
             append("&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset")
+            append("&past_days=7")
             append("&past_hours=24")
             append("&forecast_hours=24")
-            append("&forecast_days=7")
+            append("&forecast_days=14")
             append("&timezone=auto")
         }
 
@@ -243,7 +261,7 @@ class OpenMeteoWeatherRepository : WeatherRepository {
             append("https://air-quality-api.open-meteo.com/v1/air-quality?")
             append("latitude=${location.latitude}")
             append("&longitude=${location.longitude}")
-            append("&current=us_aqi,pm2_5,pm10,nitrogen_dioxide")
+            append("&current=us_aqi,pm2_5,pm10,nitrogen_dioxide,grass_pollen,birch_pollen,ragweed_pollen")
             append("&timezone=auto")
             append("&forecast_days=1")
         }
@@ -254,16 +272,31 @@ class OpenMeteoWeatherRepository : WeatherRepository {
             currentAqi = current.getDouble("us_aqi").roundToInt(),
             currentPm25 = current.getDouble("pm2_5").toFloat(),
             currentPm10 = current.getDouble("pm10").toFloat(),
-            currentNo2 = current.getDouble("nitrogen_dioxide").toFloat()
+            currentNo2 = current.getDouble("nitrogen_dioxide").toFloat(),
+            grassPollen = mapPollenLevel(current.optDouble("grass_pollen", 0.0)),
+            treePollen = mapPollenLevel(current.optDouble("birch_pollen", 0.0)),
+            ragweedPollen = mapPollenLevel(current.optDouble("ragweed_pollen", 0.0))
         )
     }
 
-    private suspend fun geocodeLocation(spec: LocationSpec): GeocodedLocation {
+    private fun mapPollenLevel(value: Double): PollenLevel {
+        return when {
+            value <= 0.5 -> PollenLevel.NONE
+            value <= 15.0 -> PollenLevel.LOW
+            value <= 50.0 -> PollenLevel.MEDIUM
+            value <= 150.0 -> PollenLevel.HIGH
+            else -> PollenLevel.VERY_HIGH
+        }
+    }
+
+    private suspend fun geocodeLocation(spec: LocationSpec, languageTag: String?): GeocodedLocation {
+        val languageCode = languageTag?.takeIf { it.isNotBlank() }?.let { java.util.Locale.forLanguageTag(it).language }
+            ?: java.util.Locale.getDefault().language
         val url = buildString {
             append("https://geocoding-api.open-meteo.com/v1/search?")
             append("name=${encodeQuery(spec.query)}")
             append("&count=1")
-            append("&language=pl")
+            append("&language=$languageCode")
             append("&countryCode=PL")
         }
 
@@ -339,7 +372,6 @@ class OpenMeteoWeatherRepository : WeatherRepository {
         val precipitation = parseDailyInts(daily, "precipitation_probability_max")
 
         return times.mapIndexedNotNull { index, date ->
-            if (date < currentDate) return@mapIndexedNotNull null
             DailyForecast(
                 date = date,
                 highTemp = highs.getOrNull(index)?.roundToInt() ?: 0,
@@ -347,38 +379,32 @@ class OpenMeteoWeatherRepository : WeatherRepository {
                 conditionEnum = mapWeatherCode(weatherCodes.getOrNull(index) ?: 3, isDay = true),
                 precipitationChance = precipitation.getOrNull(index) ?: 0
             )
-        }.take(7)
+        }.filter { forecast ->
+            val distanceDays = java.time.temporal.ChronoUnit.DAYS.between(currentDate, forecast.date)
+            distanceDays in -7L..13L
+        }
     }
 
     private fun buildTemperatureComparison(
         currentTemperature: Int,
         referenceTemperature: Double?
-    ): String {
-        val reference = referenceTemperature?.roundToInt() ?: return "Jak wczoraj"
-        val delta = currentTemperature - reference
-        return when {
-            delta > 0 -> "Cieplej o ${delta}° niż wczoraj"
-            delta < 0 -> "Chłodniej o ${abs(delta)}° niż wczoraj"
-            else -> "Podobnie jak wczoraj"
-        }
+    ): Double? {
+        val reference = referenceTemperature?.roundToInt() ?: return null
+        return (currentTemperature - reference).toDouble()
     }
 
     private fun buildPressureTrend(
         hourlyPressures: List<Double>,
         currentIndex: Int
-    ): String {
-        val currentPressure = hourlyPressures.getOrNull(currentIndex) ?: return "Stabilne"
+    ): Double? {
+        val currentPressure = hourlyPressures.getOrNull(currentIndex) ?: return null
         val threeHoursAgo = hourlyPressures.getOrNull((currentIndex - 3).coerceAtLeast(0))
-            ?: return "Stabilne"
-        val diff = currentPressure - threeHoursAgo
-        return when {
-            diff > 0.8 -> "Rosnące"
-            diff < -0.8 -> "Spadające"
-            else -> "Stabilne"
-        }
+            ?: return null
+        return currentPressure - threeHoursAgo
     }
 
     private fun buildWeatherAlert(
+        localizedContext: Context,
         currentWeather: WeatherCondition,
         hourlyForecast: List<HourlyForecast>,
         currentWindSpeed: Int,
@@ -407,31 +433,31 @@ class OpenMeteoWeatherRepository : WeatherRepository {
         return when {
             severeHour != null && severeHour.precipitationChance >= 80 -> WeatherAlert(
                 id = "open-meteo-severe-rain",
-                title = "Ostrzeżenie pogodowe",
-                description = "Prognoza wskazuje na intensywne opady lub burze w najbliższych godzinach.",
+                title = localizedContext.getString(R.string.weather_alert_warning_title),
+                description = localizedContext.getString(R.string.weather_alert_intense_rain_description),
                 severity = AlertSeverity.SEVERE,
                 expirationTime = severeHour.time.plusHours(3).toString()
             )
             severeHour != null -> WeatherAlert(
                 id = "open-meteo-severe-weather",
-                title = "Ostrzeżenie pogodowe",
-                description = "W najbliższych godzinach możliwe są gwałtowne zmiany pogody.",
+                title = localizedContext.getString(R.string.weather_alert_warning_title),
+                description = localizedContext.getString(R.string.weather_alert_rapid_change_description),
                 severity = AlertSeverity.WARNING,
                 expirationTime = severeHour.time.plusHours(3).toString()
             )
             windAlert -> WeatherAlert(
                 id = "open-meteo-wind",
-                title = "Silny wiatr",
-                description = "Open-Meteo wskazuje na silniejsze podmuchy wiatru.",
+                title = localizedContext.getString(R.string.weather_alert_wind_title),
+                description = localizedContext.getString(R.string.weather_alert_wind_description),
                 severity = AlertSeverity.WARNING,
-                expirationTime = "w ciągu kilku godzin"
+                expirationTime = localizedContext.getString(R.string.weather_alert_expires_in_hours)
             )
             uvAlert -> WeatherAlert(
                 id = "open-meteo-uv",
-                title = "Wysoki indeks UV",
-                description = "Dzisiejszy indeks UV sugeruje ograniczenie ekspozycji na słońce.",
+                title = localizedContext.getString(R.string.weather_alert_uv_title),
+                description = localizedContext.getString(R.string.weather_alert_uv_description),
                 severity = AlertSeverity.INFO,
-                expirationTime = "do końca dnia"
+                expirationTime = localizedContext.getString(R.string.weather_alert_until_end_of_day)
             )
             currentWeather in setOf(
                 WeatherCondition.DAY_THUNDERSTORM,
@@ -443,10 +469,10 @@ class OpenMeteoWeatherRepository : WeatherRepository {
                 WeatherCondition.NIGHT_THUNDERSTORM_MEDIUM_RAIN
             ) -> WeatherAlert(
                 id = "open-meteo-current-storm",
-                title = "Burza w okolicy",
-                description = "Aktualne dane pogodowe wskazują na burzowe warunki.",
+                title = localizedContext.getString(R.string.weather_alert_storm_title),
+                description = localizedContext.getString(R.string.weather_alert_storm_description),
                 severity = AlertSeverity.WARNING,
-                expirationTime = "teraz"
+                expirationTime = localizedContext.getString(R.string.weather_alert_now)
             )
             else -> null
         }
@@ -499,48 +525,6 @@ class OpenMeteoWeatherRepository : WeatherRepository {
 
     private fun encodeQuery(value: String): String = java.net.URLEncoder.encode(value, Charsets.UTF_8.name())
 
-    private fun formatVisibility(meters: Int): String {
-        return if (meters >= 1000) {
-            "${(meters / 1000.0).roundToInt()} km"
-        } else {
-            "$meters m"
-        }
-    }
-
-    private fun toWindDirectionLabel(degrees: Double): String {
-        val normalized = ((degrees % 360) + 360) % 360
-        return when {
-            normalized < 22.5 || normalized >= 337.5 -> "Północny"
-            normalized < 67.5 -> "Północno-wschodni"
-            normalized < 112.5 -> "Wschodni"
-            normalized < 157.5 -> "Południowo-wschodni"
-            normalized < 202.5 -> "Południowy"
-            normalized < 247.5 -> "Południowo-zachodni"
-            normalized < 292.5 -> "Zachodni"
-            else -> "Północno-zachodni"
-        }
-    }
-
-    private fun conditionLabel(condition: WeatherCondition): String {
-        return when (condition) {
-            WeatherCondition.DAY_SUNNY, WeatherCondition.NIGHT_CLEAR -> "Bezchmurnie"
-            WeatherCondition.DAY_PARTLY_CLOUDY, WeatherCondition.NIGHT_PARTLY_CLOUDY -> "Częściowo pochmurno"
-            WeatherCondition.DAY_CLOUDY, WeatherCondition.NIGHT_CLOUDY -> "Pochmurno"
-            WeatherCondition.DAY_RAIN_LIGHT, WeatherCondition.NIGHT_RAIN_LIGHT -> "Lekki deszcz"
-            WeatherCondition.DAY_RAIN_MEDIUM, WeatherCondition.NIGHT_RAIN_MEDIUM -> "Deszcz"
-            WeatherCondition.DAY_RAIN_HEAVY -> "Ulewa"
-            WeatherCondition.DAY_SNOW, WeatherCondition.NIGHT_SNOW -> "Śnieg"
-            WeatherCondition.DAY_FOG, WeatherCondition.NIGHT_FOG, WeatherCondition.DAY_FOG_CLOUDY -> "Mgła"
-            WeatherCondition.DAY_THUNDERSTORM, WeatherCondition.NIGHT_THUNDERSTORM -> "Burza"
-            WeatherCondition.DAY_THUNDERSTORM_HEAVY -> "Silna burza"
-            WeatherCondition.DAY_THUNDERSTORM_RAIN_LIGHT, WeatherCondition.NIGHT_THUNDERSTORM_RAIN_LIGHT -> "Burza z deszczem"
-            WeatherCondition.DAY_THUNDERSTORM_RAIN_MEDIUM, WeatherCondition.NIGHT_THUNDERSTORM_MEDIUM_RAIN -> "Burza z ulewnym deszczem"
-            WeatherCondition.DAY_WIND, WeatherCondition.NIGHT_WIND -> "Wietrznie"
-            WeatherCondition.DAY_WIND_CLOUDY -> "Wietrznie i pochmurno"
-            WeatherCondition.DAY_FOG_CLOUDY -> "Mgliście i pochmurno"
-        }
-    }
-
     private fun mapWeatherCode(code: Int, isDay: Boolean): WeatherCondition {
         return when (code) {
             0 -> if (isDay) WeatherCondition.DAY_SUNNY else WeatherCondition.NIGHT_CLEAR
@@ -568,6 +552,13 @@ class OpenMeteoWeatherRepository : WeatherRepository {
         val currentAqi: Int,
         val currentPm25: Float,
         val currentPm10: Float,
-        val currentNo2: Float
+        val currentNo2: Float,
+        val grassPollen: PollenLevel,
+        val treePollen: PollenLevel,
+        val ragweedPollen: PollenLevel
     )
+
+    private fun locationCacheKey(locationId: String, languageTag: String?): String {
+        return "${languageTag.orEmpty()}::$locationId"
+    }
 }

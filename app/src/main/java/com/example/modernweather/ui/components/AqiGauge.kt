@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -25,6 +26,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import com.example.modernweather.R
 import com.example.modernweather.ui.theme.*
 
 @Composable
@@ -66,13 +68,14 @@ fun AqiGauge(
 
     val currentAnimatedAqiValue = (sweepAngle / 240f) * maxAqi
     val gaugeColor = getAqiColor(aqiValue = currentAnimatedAqiValue)
+    val finalGaugeColor = getAqiColor(aqiValue = aqi.toFloat())
 
     val aqiText = when {
-        currentAnimatedAqiValue <= 50 -> "Dobra"
-        currentAnimatedAqiValue <= 100 -> "Umiarkowana"
-        currentAnimatedAqiValue <= 150 -> "Niezdrowa"
-        currentAnimatedAqiValue <= 200 -> "Bardzo zła"
-        else -> "Tragiczna"
+        aqi <= 50 -> stringResource(R.string.aqi_good)
+        aqi <= 100 -> stringResource(R.string.aqi_moderate)
+        aqi <= 150 -> stringResource(R.string.aqi_unhealthy)
+        aqi <= 200 -> stringResource(R.string.aqi_very_unhealthy)
+        else -> stringResource(R.string.aqi_hazardous)
     }
 
     val surfaceVariant = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -131,7 +134,7 @@ fun AqiGauge(
             Text(
                 text = aqiText,
                 fontSize = 12.sp,
-                color = gaugeColor,
+                color = finalGaugeColor,
             )
         }
     }

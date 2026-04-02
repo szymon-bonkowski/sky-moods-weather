@@ -14,7 +14,9 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.modernweather.R
 import com.example.modernweather.data.models.Location
 import com.example.modernweather.ui.viewmodel.LocationsUiState
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
@@ -31,7 +33,7 @@ fun LocationsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Moje Lokalizacje") },
+                title = { Text(stringResource(R.string.locations_title)) },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                     titleContentColor = MaterialTheme.colorScheme.onBackground
@@ -40,7 +42,7 @@ fun LocationsScreen(
                     IconButton(onClick = onSettingsClick) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "Ustawienia"
+                            contentDescription = stringResource(R.string.locations_settings_content_description)
                         )
                     }
                 }
@@ -58,7 +60,7 @@ fun LocationsScreen(
                 }
                 uiState.error != null -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Błąd: ${uiState.error}")
+                        Text(stringResource(R.string.locations_error_prefix, uiState.error ?: ""))
                     }
                 }
                 else -> {
@@ -68,7 +70,7 @@ fun LocationsScreen(
                     ) {
                         item(key = "header") {
                             Text(
-                                "ZAPISANE LOKALIZACJE",
+                                stringResource(R.string.locations_saved_header),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(bottom = 8.dp, top = 16.dp)
@@ -93,8 +95,8 @@ private fun SearchBar() {
         value = "",
         onValueChange = {},
         readOnly = true,
-        placeholder = { Text("Szukaj miejsca lub kodu pocztowego") },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Szukaj") },
+        placeholder = { Text(stringResource(R.string.locations_search_hint)) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = stringResource(R.string.locations_search_content_description)) },
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
@@ -118,7 +120,7 @@ private fun LocationItem(location: Location, onClick: () -> Unit) {
         ) {
             Icon(
                 imageVector = Icons.Default.LocationOn,
-                contentDescription = "Lokalizacja",
+                contentDescription = stringResource(R.string.locations_location_content_description),
                 tint = if (location.isCurrentLocation) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(modifier = Modifier.width(16.dp))

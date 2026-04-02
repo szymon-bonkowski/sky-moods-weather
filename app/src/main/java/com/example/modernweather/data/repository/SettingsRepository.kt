@@ -5,12 +5,16 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.example.modernweather.data.models.AppLanguage
 import com.example.modernweather.data.models.TemperatureUnit
 import com.example.modernweather.data.models.UserSettings
 import com.example.modernweather.data.models.WeatherDataSource
+import java.io.IOException
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -24,23 +28,34 @@ class SettingsRepository(context: Context) {
         private val IS_SYSTEM_THEME_KEY = booleanPreferencesKey("is_system_theme")
         private val IS_DARK_THEME_KEY = booleanPreferencesKey("is_dark_theme")
         private val WEATHER_SOURCE_KEY = intPreferencesKey("weather_source")
+        private val APP_LANGUAGE_KEY = stringPreferencesKey("app_language")
     }
 
-    val userSettingsFlow: Flow<UserSettings> = dataStore.data.map { preferences ->
-        val tempUnit = TemperatureUnit.valueOf(
-            preferences[TEMP_UNIT_KEY] ?: TemperatureUnit.CELSIUS.name
-        )
+    val userSettingsFlow: Flow<UserSettings> = dataStore.data
+        .catch { exception ->
+            if (exception is IOException) {
+                emit(emptyPreferences())
+            } else {
+                throw exception
+            }
+        }
+        .map { preferences ->
+        val tempUnit = TemperatureUnit.entries.firstOrNull {
+            it.name == preferences[TEMP_UNIT_KEY]
+        } ?: TemperatureUnit.CELSIUS
         val isSystemTheme = preferences[IS_SYSTEM_THEME_KEY] ?: true
         val isDarkTheme = preferences[IS_DARK_THEME_KEY] ?: false
-        val weatherDataSource = runCatching {
-            WeatherDataSource.entries[preferences[WEATHER_SOURCE_KEY] ?: WeatherDataSource.FAKE.ordinal]
-        }.getOrDefault(WeatherDataSource.FAKE)
+        val weatherDataSource = WeatherDataSource.entries.getOrNull(
+            preferences[WEATHER_SOURCE_KEY] ?: WeatherDataSource.FAKE.ordinal
+        ) ?: WeatherDataSource.FAKE
+        val appLanguage = AppLanguage.fromLanguageTag(preferences[APP_LANGUAGE_KEY])
 
         UserSettings(
             temperatureUnit = tempUnit,
             isSystemTheme = isSystemTheme,
             isDarkTheme = isDarkTheme,
-            weatherDataSource = weatherDataSource
+            weatherDataSource = weatherDataSource,
+            appLanguage = appLanguage
         )
     }
 
@@ -60,6 +75,12 @@ class SettingsRepository(context: Context) {
     suspend fun updateWeatherDataSource(source: WeatherDataSource) {
         dataStore.edit { preferences ->
             preferences[WEATHER_SOURCE_KEY] = source.ordinal
+        }
+    }
+
+    suspend fun updateAppLanguage(language: AppLanguage) {
+        dataStore.edit { preferences ->
+            preferences[APP_LANGUAGE_KEY] = language.languageTag
         }
     }
 }

@@ -59,14 +59,7 @@
     <string name="weather_detail_radar_section">RADAR</string>
     <string name="weather_detail_radar_preview_content_description">Radar preview</string>
     <string name="weather_detail_open_radar_map">Open radar map</string>
-    <string name="weather_detail_pressure_drop_format">Pressure: %1$s hPa | 3h drop: %2$s hPa</string>
     <string name="weather_detail_alert_expires_format">Valid until: %1$s</string>
-    <string name="local_nowcast_risk_low">Low risk of sudden storm/front</string>
-    <string name="local_nowcast_risk_elevated">Elevated weather-change risk</string>
-    <string name="local_nowcast_risk_high">High risk of rapid weather breakdown</string>
-    <string name="local_nowcast_risk_severe">Very high risk of storm/strong wind</string>
-    <string name="weather_alert_thunderstorm_title">Weather alert</string>
-    <string name="weather_alert_thunderstorm_description">Thunderstorms are possible in the coming hours.</string>
     <string name="pollen_level_none">None</string>
     <string name="pollen_level_low">Low</string>
     <string name="pollen_level_medium">Medium</string>

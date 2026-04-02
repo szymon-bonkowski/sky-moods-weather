@@ -17,6 +17,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
+import com.example.modernweather.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -25,10 +27,10 @@ fun RadarScreen(onNavigateBack: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Radar pogodowy") },
+                title = { Text(stringResource(R.string.radar_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wroc")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -44,7 +46,7 @@ fun RadarScreen(onNavigateBack: () -> Unit) {
         ) {
             // TODO: replace this placeholder with a real radar view.
             Text(
-                text = "Placeholder",
+                text = stringResource(R.string.radar_placeholder),
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )

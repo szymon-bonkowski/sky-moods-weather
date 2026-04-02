@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.dp
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.example.modernweather.R
+import com.example.modernweather.data.models.AppLanguage
 import com.example.modernweather.data.models.TemperatureUnit
 import com.example.modernweather.data.models.WeatherDataSource
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
@@ -64,10 +67,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ustawienia") },
+                title = { Text(stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Wróć")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
@@ -82,14 +85,14 @@ fun SettingsScreen(
                 .fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            TitledCard(title = "JEDNOSTKI") {
+            TitledCard(title = stringResource(R.string.settings_section_units)) {
                 TemperatureUnitSelector(
                     selectedUnit = settingsState.temperatureUnit,
                     onUnitSelected = { viewModel.updateTemperatureUnit(it) }
                 )
             }
 
-            TitledCard(title = "WYGLĄD") {
+            TitledCard(title = stringResource(R.string.settings_section_appearance)) {
                 ThemeSelector(
                     isSystem = settingsState.isSystemTheme,
                     isDark = settingsState.isDarkTheme,
@@ -99,14 +102,14 @@ fun SettingsScreen(
                 )
             }
 
-            TitledCard(title = "ŹRÓDŁO DANYCH") {
+            TitledCard(title = stringResource(R.string.settings_section_data_source)) {
                 WeatherSourceSelector(
                     selectedSource = settingsState.weatherDataSource,
                     onSourceSelected = viewModel::updateWeatherDataSource
                 )
             }
 
-            TitledCard(title = "LOKALNY NOWCAST") {
+            TitledCard(title = stringResource(R.string.settings_section_nowcast)) {
                 NowcastSettingsSection(
                     monitoringEnabled = settingsState.nowcastMonitoringEnabled,
                     notificationsEnabled = settingsState.nowcastNotificationsEnabled,
@@ -115,6 +118,13 @@ fun SettingsScreen(
                     onMonitoringChanged = viewModel::updateNowcastMonitoring,
                     onNotificationsChanged = viewModel::updateNowcastNotifications,
                     onUseTfliteChanged = viewModel::updateNowcastUseTflite
+                )
+            }
+
+            TitledCard(title = stringResource(R.string.settings_section_language)) {
+                LanguageSelector(
+                    selectedLanguage = settingsState.appLanguage,
+                    onLanguageSelected = viewModel::updateAppLanguage
                 )
             }
         }
@@ -126,7 +136,7 @@ fun TemperatureUnitSelector(
     selectedUnit: TemperatureUnit,
     onUnitSelected: (TemperatureUnit) -> Unit
 ) {
-    SettingItem(label = "Temperatura") {
+    SettingItem(label = stringResource(R.string.settings_temperature_label)) {
         SegmentedButtonRow(
             selectedUnit = selectedUnit,
             onUnitSelected = onUnitSelected
@@ -141,11 +151,11 @@ fun ThemeSelector(
     onThemeSelected: (Boolean, Boolean) -> Unit
 ) {
     Column {
-        SettingItem(label = "Motyw systemowy") {
+        SettingItem(label = stringResource(R.string.settings_system_theme_label)) {
             Switch(checked = isSystem, onCheckedChange = { onThemeSelected(it, isDark) })
         }
         AnimatedVisibility(visible = !isSystem) {
-            SettingItem(label = "Tryb ciemny") {
+            SettingItem(label = stringResource(R.string.settings_dark_theme_label)) {
                 Switch(checked = isDark, onCheckedChange = { onThemeSelected(isSystem, it) })
             }
         }
@@ -158,7 +168,7 @@ fun WeatherSourceSelector(
     onSourceSelected: (WeatherDataSource) -> Unit
 ) {
     Column {
-        SettingItem(label = "Użyj Open-Meteo") {
+        SettingItem(label = stringResource(R.string.settings_use_open_meteo)) {
             Switch(
                 checked = selectedSource == WeatherDataSource.OPEN_METEO,
                 onCheckedChange = { checked ->
@@ -168,9 +178,9 @@ fun WeatherSourceSelector(
         }
         Text(
             text = if (selectedSource == WeatherDataSource.OPEN_METEO) {
-                "Realne dane pogodowe i jakość powietrza."
+                stringResource(R.string.settings_open_meteo_description)
             } else {
-                "Fake data do ręcznych zmian i testów."
+                stringResource(R.string.settings_fake_data_description)
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -235,7 +245,7 @@ private fun NowcastSettingsSection(
     onUseTfliteChanged: (Boolean) -> Unit
 ) {
     Column {
-        SettingItem(label = "Włącz lokalne wykrywanie frontów") {
+        SettingItem(label = stringResource(R.string.settings_enable_local_nowcast)) {
             Switch(
                 checked = monitoringEnabled && hasBarometer,
                 onCheckedChange = onMonitoringChanged,
@@ -245,7 +255,7 @@ private fun NowcastSettingsSection(
 
         if (!hasBarometer) {
             Text(
-                text = "Twoje urządzenie nie posiada barometru, który jest niezbędny do działania tej funkcji.",
+                text = stringResource(R.string.settings_no_barometer_warning),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -254,13 +264,51 @@ private fun NowcastSettingsSection(
 
         AnimatedVisibility(visible = monitoringEnabled && hasBarometer) {
             Column {
-                SettingItem(label = "Powiadomienia o zagrożeniu") {
+                SettingItem(label = stringResource(R.string.settings_nowcast_notifications_label)) {
                     Switch(checked = notificationsEnabled, onCheckedChange = onNotificationsChanged)
                 }
-                SettingItem(label = "Model ML (TensorFlow Lite)") {
+                SettingItem(label = stringResource(R.string.settings_nowcast_ml_model_label)) {
                     Switch(checked = useTflite, onCheckedChange = onUseTfliteChanged)
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun LanguageSelector(
+    selectedLanguage: AppLanguage,
+    onLanguageSelected: (AppLanguage) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AppLanguage.entries.forEach { language ->
+            LanguageOption(
+                language = language,
+                selected = language == selectedLanguage,
+                onClick = { onLanguageSelected(language) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun LanguageOption(
+    language: AppLanguage,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(text = stringResource(language.labelResId), style = MaterialTheme.typography.bodyLarge)
+        if (selected) {
+            Icon(Icons.Default.Check, contentDescription = null)
         }
     }
 }

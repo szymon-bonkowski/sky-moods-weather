@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -30,6 +31,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.ExperimentalTextApi
 import androidx.compose.ui.text.TextLayoutResult
@@ -40,10 +42,12 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.util.Locale
 import com.example.modernweather.data.models.CurrentWeather
 import com.example.modernweather.data.models.HourlyForecast
 import com.example.modernweather.data.models.TemperatureUnit
 import com.example.modernweather.data.models.WeatherCondition
+import com.example.modernweather.R
 import com.example.modernweather.ui.screens.toFahrenheit
 import com.example.modernweather.ui.theme.AccentBlue
 import com.example.modernweather.ui.components.weatherConditionIconRes
@@ -143,7 +147,7 @@ fun CurrentWeatherSection(
 
             val displayFeelsLike = if (unit == TemperatureUnit.CELSIUS) current.feelsLike else toFahrenheit(current.feelsLike)
             Text(
-                text = "Odczuwalna $displayFeelsLike° • ${current.temperatureComparison}",
+                text = stringResource(R.string.current_weather_feels_like_format, displayFeelsLike, current.temperatureComparison),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -152,7 +156,7 @@ fun CurrentWeatherSection(
             Spacer(modifier = Modifier.height(32.dp))
 
             Text(
-                text = "PROGNOZA GODZINOWA",
+                text = stringResource(R.string.current_weather_hourly_forecast),
                 style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f),
                 modifier = Modifier
@@ -177,7 +181,7 @@ private fun HourlySimpleList(
 ) {
     if (hourlyForecast.isEmpty()) return
 
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()) }
 
     val currentHourIndex = remember(hourlyForecast) {
         val index = hourlyForecast.indexOfFirst { it.isCurrent }
@@ -196,22 +200,8 @@ private fun HourlySimpleList(
         }
     }
 
-    val nestedScrollConnection = remember(currentHourIndex) {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                val isPullingIntoPast = available.x > 0
-                val inPast = listState.firstVisibleItemIndex < currentHourIndex
-                
-                if (isPullingIntoPast && (inPast || listState.firstVisibleItemIndex == currentHourIndex)) {
-                    val resistance = 0.05f
-                    return Offset(available.x * resistance, 0f)
-                }
-                return Offset.Zero
-            }
-        }
-    }
-
     val chartShape = RoundedCornerShape(24.dp)
+    val density = LocalDensity.current
 
     BoxWithConstraints(
         modifier = Modifier
@@ -234,8 +224,70 @@ private fun HourlySimpleList(
     ) {
         val itemWidth = 48.dp
         val horizontalPadding = 16.dp
-        val availableWidth = maxWidth - (horizontalPadding * 2)
+        val availableWidth = this@BoxWithConstraints.maxWidth - (horizontalPadding * 2)
         val exactSpacing = ((availableWidth - (itemWidth * 6)) / 5).coerceAtLeast(4.dp)
+        val defaultStridePx = with(density) { (itemWidth + exactSpacing).toPx() }
+        val nestedScrollConnection = remember(currentHourIndex, defaultStridePx) {
+            object : NestedScrollConnection {
+                fun estimatedStridePx(): Float {
+                    val measuredStride = listState.layoutInfo.visibleItemsInfo
+                        .zipWithNext()
+                        .firstOrNull { (first, second) -> second.index == first.index + 1 }
+                        ?.let { (first, second) -> (second.offset - first.offset).toFloat() }
+                        ?.takeIf { it > 0f }
+                    return measuredStride ?: defaultStridePx
+                }
+
+                fun distanceToNowBoundaryPx(): Float {
+                    val firstVisibleIndex = listState.firstVisibleItemIndex
+                    val firstVisibleOffset = listState.firstVisibleItemScrollOffset.toFloat()
+                    return when {
+                        firstVisibleIndex < currentHourIndex -> 0f
+                        firstVisibleIndex == currentHourIndex -> firstVisibleOffset
+                        else -> {
+                            val stridePx = estimatedStridePx()
+                            (firstVisibleIndex - currentHourIndex) * stridePx + firstVisibleOffset
+                        }
+                    }
+                }
+
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    val pullingPast = available.x > 0f
+                    if (!pullingPast) return Offset.Zero
+
+                    val firstVisibleIndex = listState.firstVisibleItemIndex
+                    val firstVisibleOffset = listState.firstVisibleItemScrollOffset
+                    val isInPast = firstVisibleIndex < currentHourIndex
+                    val isAtNow = firstVisibleIndex == currentHourIndex && firstVisibleOffset == 0
+
+                    if (source == NestedScrollSource.SideEffect) {
+                        if (isInPast) {
+                            return available
+                        }
+                        val distanceToBoundary = distanceToNowBoundaryPx()
+                        if (distanceToBoundary <= 0f) {
+                            return available
+                        }
+                        val overflowPastNow = (available.x - distanceToBoundary).coerceAtLeast(0f)
+                        if (overflowPastNow > 0f) {
+                            return Offset(overflowPastNow, 0f)
+                        }
+                    }
+
+                    if (isInPast || isAtNow) {
+                        return Offset(available.x * 0.05f, 0f)
+                    }
+                    return Offset.Zero
+                }
+
+                override suspend fun onPreFling(available: Velocity): Velocity {
+                    if (available.x > 0f && listState.firstVisibleItemIndex <= currentHourIndex) {
+                        return available
+                    }
+                    return Velocity.Zero
+                }
+            }
+        }
 
         LazyRow(
             modifier = Modifier
@@ -269,7 +321,7 @@ private fun HourlySimpleList(
                         )
                 ) {
                     Text(
-                        text = if (isNow) "Teraz" else forecast.time.format(timeFormatter),
+                        text = if (isNow) stringResource(R.string.current_weather_now_label) else forecast.time.format(timeFormatter),
                         style = MaterialTheme.typography.labelMedium,
                         color = if (isNow) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = if (isNow) FontWeight.Bold else FontWeight.Normal
@@ -303,7 +355,7 @@ private fun HourlyWaveChart(
 
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
-    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
+    val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()) }
 
     val displayTemps = remember(hourlyForecast, unit) {
         hourlyForecast.map { forecast ->

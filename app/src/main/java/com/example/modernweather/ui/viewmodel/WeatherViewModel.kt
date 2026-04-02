@@ -4,7 +4,9 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.core.os.LocaleListCompat
 import com.example.modernweather.data.models.Location
+import com.example.modernweather.data.models.AppLanguage
 import com.example.modernweather.data.models.TemperatureUnit
 import com.example.modernweather.data.models.WeatherData
 import com.example.modernweather.data.models.WeatherDataSource
@@ -50,7 +52,8 @@ data class SettingsUiState(
     val nowcastMonitoringEnabled: Boolean = true,
     val nowcastNotificationsEnabled: Boolean = true,
     val nowcastUseTfliteEnabled: Boolean = true,
-    val weatherDataSource: WeatherDataSource = WeatherDataSource.FAKE
+    val weatherDataSource: WeatherDataSource = WeatherDataSource.FAKE,
+    val appLanguage: AppLanguage = AppLanguage.SYSTEM
 )
 
 class WeatherViewModel(application: Application) : ViewModel() {
@@ -61,8 +64,8 @@ class WeatherViewModel(application: Application) : ViewModel() {
 
     private val settingsRepository = SettingsRepository(application)
     private val nowcastRepository = NowcastRepository(application)
-    private val fakeWeatherRepository = FakeWeatherRepository()
-    private val openMeteoWeatherRepository = OpenMeteoWeatherRepository()
+    private val fakeWeatherRepository = FakeWeatherRepository(application)
+    private val openMeteoWeatherRepository = OpenMeteoWeatherRepository(application)
 
     private var weatherRepository: WeatherRepository = fakeWeatherRepository
     private val applicationContext = application.applicationContext
@@ -74,6 +77,17 @@ class WeatherViewModel(application: Application) : ViewModel() {
         .distinctUntilChanged()
         .onEach { source ->
             selectWeatherRepository(source)
+            if (weatherDetailLocationId != null) {
+                reloadWeatherDetail()
+            }
+            loadSavedLocations()
+        }
+        .launchIn(viewModelScope)
+
+    private val languageJob = settingsRepository.userSettingsFlow
+        .map { it.appLanguage }
+        .distinctUntilChanged()
+        .onEach {
             if (weatherDetailLocationId != null) {
                 reloadWeatherDetail()
             }
@@ -98,7 +112,8 @@ class WeatherViewModel(application: Application) : ViewModel() {
             nowcastMonitoringEnabled = nowcastSettings.monitoringEnabled,
             nowcastNotificationsEnabled = nowcastSettings.notificationsEnabled,
             nowcastUseTfliteEnabled = nowcastSettings.useTfliteModel,
-            weatherDataSource = userSettings.weatherDataSource
+            weatherDataSource = userSettings.weatherDataSource,
+            appLanguage = userSettings.appLanguage
         )
     }.stateIn(
         scope = viewModelScope,
@@ -141,8 +156,9 @@ class WeatherViewModel(application: Application) : ViewModel() {
         weatherDetailLocationId = locationId
 
         weatherDetailJob = viewModelScope.launch {
+            val languageTag = currentLanguageTag()
             _weatherDetailState.value = WeatherDetailUiState.Loading
-            weatherRepository.getWeatherData(locationId)
+            weatherRepository.getWeatherData(locationId, languageTag)
                 .catch { e ->
                     _weatherDetailState.value = WeatherDetailUiState.Error("Nie udało się załadować danych: ${e.message}")
                 }
@@ -163,6 +179,18 @@ class WeatherViewModel(application: Application) : ViewModel() {
     fun updateWeatherDataSource(source: WeatherDataSource) {
         viewModelScope.launch {
             settingsRepository.updateWeatherDataSource(source)
+        }
+    }
+
+    fun updateAppLanguage(language: AppLanguage) {
+        viewModelScope.launch {
+            settingsRepository.updateAppLanguage(language)
+            val locales = if (language == AppLanguage.SYSTEM) {
+                LocaleListCompat.getEmptyLocaleList()
+            } else {
+                LocaleListCompat.forLanguageTags(language.languageTag)
+            }
+            androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(locales)
         }
     }
 
@@ -196,8 +224,9 @@ class WeatherViewModel(application: Application) : ViewModel() {
 
     fun loadSavedLocations() {
         viewModelScope.launch {
+            val languageTag = currentLanguageTag()
             _locationsState.value = LocationsUiState(isLoading = true)
-            weatherRepository.getSavedLocations()
+            weatherRepository.getSavedLocations(languageTag)
                 .catch { e ->
                     _locationsState.value = LocationsUiState(isLoading = false, error = e.message)
                 }
@@ -232,5 +261,9 @@ class WeatherViewModel(application: Application) : ViewModel() {
         weatherDetailJob = null
         _weatherDetailState.value = WeatherDetailUiState.Loading
         loadWeatherData(locationId)
+    }
+
+    private fun currentLanguageTag(): String? {
+        return settingsState.value.appLanguage.languageTag.takeIf { it.isNotBlank() }
     }
 }

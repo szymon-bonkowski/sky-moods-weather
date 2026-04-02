@@ -2,7 +2,7 @@ package com.example.modernweather
 
 import android.Manifest
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -14,11 +14,18 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import com.example.modernweather.ui.navigation.AppNavigation
 import com.example.modernweather.ui.theme.ModernWeatherTheme
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
+import com.example.modernweather.data.models.AppLanguage
+import com.example.modernweather.data.repository.SettingsRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {}
@@ -39,6 +46,17 @@ class MainActivity : ComponentActivity() {
         }
 
         WeatherViewModel.Factory = viewModelFactory
+
+        val appLanguage = runBlocking(Dispatchers.IO) {
+            SettingsRepository(application).userSettingsFlow.first().appLanguage
+        }
+        AppCompatDelegate.setApplicationLocales(
+            if (appLanguage == AppLanguage.SYSTEM) {
+                LocaleListCompat.getEmptyLocaleList()
+            } else {
+                LocaleListCompat.forLanguageTags(appLanguage.languageTag)
+            }
+        )
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
             checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED

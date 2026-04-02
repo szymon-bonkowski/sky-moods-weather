@@ -3,19 +3,27 @@ package com.example.modernweather.ui.components
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -24,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.modernweather.data.models.DailyForecast
@@ -95,6 +104,7 @@ fun WeeklyForecastChart(
 
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
+    val locale = LocalContext.current.resources.configuration.locales[0] ?: Locale.getDefault()
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
     val dayPainters = dailyForecasts.map { forecast ->
@@ -103,7 +113,6 @@ fun WeeklyForecastChart(
     val nightPainters = dailyForecasts.map { forecast ->
         painterResource(id = weatherConditionIconRes(forecast.conditionEnum, false))
     }
-
     val forecastKey = remember(dailyForecasts) {
         dailyForecasts.joinToString("|") { forecast ->
             "${forecast.date}:${forecast.highTemp}:${forecast.lowTemp}:${forecast.conditionEnum}"
@@ -153,8 +162,8 @@ fun WeeklyForecastChart(
         dailyForecasts.map { forecast ->
             var dayOfWeekText = forecast.date.dayOfWeek.getDisplayName(
                 JavaTextStyle.SHORT,
-                Locale.forLanguageTag("pl")
-            ).replaceFirstChar { it.titlecase(Locale.forLanguageTag("pl")) }
+                locale
+            ).replaceFirstChar { it.titlecase(locale) }
             if (dayOfWeekText == "Niedz.") dayOfWeekText = "Ndz."
             val dayOfWeekTextNoDot = dayOfWeekText.removeSuffix(".")
             val dot = if (dayOfWeekText.endsWith(".")) "." else ""
@@ -239,41 +248,121 @@ fun WeeklyForecastChart(
         }
     }
 
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .onSizeChanged { canvasSize = it }
-    ) {
-        val layoutData = chartLayoutData ?: return@Canvas
-        drawGridLines(
-            points = layoutData.points,
-            yTop = layoutData.yTopPadding,
-            yBottom = layoutData.yBottom
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val viewportWidthPx = with(density) { this@BoxWithConstraints.maxWidth.toPx() }
+        val xPaddingPx = with(density) { 24.dp.toPx() }
+        val weekStepPx = ((viewportWidthPx - 2f * xPaddingPx) / 6f).coerceAtLeast(0f)
+        val chartWidthPx = maxOf(
+            viewportWidthPx,
+            xPaddingPx * 2f + weekStepPx * (dailyForecasts.size - 1).coerceAtLeast(1)
         )
-        drawTemperatureLines(
-            highLinePaths = layoutData.highLinePaths,
-            lowLinePaths = layoutData.lowLinePaths,
-            highColor = AccentYellow,
-            lowColor = AccentBlue,
-            progress = animationProgress.value
-        )
-        drawLabels(layoutData.points, labelLayouts, size)
+        val chartWidthDp = with(density) { chartWidthPx.toDp() }
+        val currentDayIndex = remember(dailyForecasts) {
+            val today = LocalDate.now()
+            dailyForecasts.indexOfFirst { it.date == today }
+                .takeIf { it >= 0 }
+                ?: dailyForecasts.indexOfFirst { !it.date.isBefore(today) }.takeIf { it >= 0 }
+                ?: 0
+        }
+        val initialScrollPx = remember(viewportWidthPx, chartWidthPx, weekStepPx, currentDayIndex) {
+            val anchor = currentDayIndex * weekStepPx
+            val maxScroll = (chartWidthPx - viewportWidthPx).coerceAtLeast(0f)
+            anchor.coerceIn(0f, maxScroll).toInt()
+        }
+        val scrollState = rememberScrollState(initial = initialScrollPx)
+        val nestedScrollConnection = remember(initialScrollPx) {
+            object : NestedScrollConnection {
+                fun distanceToNowBoundaryPx(): Float {
+                    return (scrollState.value - initialScrollPx).toFloat().coerceAtLeast(0f)
+                }
 
-        layoutData.points.forEachIndexed { index, point ->
-            drawWeatherIcon(
-                painter = dayPainters[index],
-                x = point.xPosition,
-                y = point.highYPosition,
-                iconSize = layoutData.iconSize,
-                alpha = animationProgress.value
-            )
-            drawWeatherIcon(
-                painter = nightPainters[index],
-                x = point.xPosition,
-                y = point.lowYPosition,
-                iconSize = layoutData.iconSize,
-                alpha = animationProgress.value
-            )
+                override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                    val pullingPast = available.x > 0f
+                    if (!pullingPast) return Offset.Zero
+
+                    val currentScroll = scrollState.value
+                    val isInPast = currentScroll < initialScrollPx
+                    val isAtNow = currentScroll == initialScrollPx
+
+                    if (source == NestedScrollSource.SideEffect) {
+                        if (isInPast) {
+                            return available
+                        }
+                        val distanceToBoundary = distanceToNowBoundaryPx()
+                        if (distanceToBoundary <= 0f) {
+                            return available
+                        }
+                        val overflowPastNow = (available.x - distanceToBoundary).coerceAtLeast(0f)
+                        if (overflowPastNow > 0f) {
+                            return Offset(overflowPastNow, 0f)
+                        }
+                    }
+
+                    if (isInPast || isAtNow) {
+                        return Offset(available.x * 0.05f, 0f)
+                    }
+                    return Offset.Zero
+                }
+
+                override suspend fun onPreFling(available: Velocity): Velocity {
+                    if (available.x > 0f && scrollState.value <= initialScrollPx) {
+                        return available
+                    }
+                    return Velocity.Zero
+                }
+            }
+        }
+
+        LaunchedEffect(scrollState.isScrollInProgress, initialScrollPx) {
+            if (!scrollState.isScrollInProgress && scrollState.value < initialScrollPx) {
+                scrollState.animateScrollTo(initialScrollPx.coerceAtMost(scrollState.maxValue))
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .nestedScroll(nestedScrollConnection)
+                .horizontalScroll(scrollState)
+        ) {
+            Canvas(
+                modifier = Modifier
+                    .width(chartWidthDp)
+                    .fillMaxHeight()
+                    .onSizeChanged { canvasSize = it }
+            ) {
+                val layoutData = chartLayoutData ?: return@Canvas
+                drawGridLines(
+                    points = layoutData.points,
+                    yTop = layoutData.yTopPadding,
+                    yBottom = layoutData.yBottom
+                )
+                drawTemperatureLines(
+                    highLinePaths = layoutData.highLinePaths,
+                    lowLinePaths = layoutData.lowLinePaths,
+                    highColor = AccentYellow,
+                    lowColor = AccentBlue,
+                    progress = animationProgress.value
+                )
+                drawLabels(layoutData.points, labelLayouts, size)
+
+                layoutData.points.forEachIndexed { index, point ->
+                    drawWeatherIcon(
+                        painter = dayPainters[index],
+                        x = point.xPosition,
+                        y = point.highYPosition,
+                        iconSize = layoutData.iconSize,
+                        alpha = animationProgress.value
+                    )
+                    drawWeatherIcon(
+                        painter = nightPainters[index],
+                        x = point.xPosition,
+                        y = point.lowYPosition,
+                        iconSize = layoutData.iconSize,
+                        alpha = animationProgress.value
+                    )
+                }
+            }
         }
     }
 }

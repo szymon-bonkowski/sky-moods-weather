@@ -1,4 +1,6 @@
 package com.example.modernweather.data.models
+
+import androidx.compose.runtime.Immutable
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -77,7 +79,7 @@ data class WeatherAlert(
     val severity: AlertSeverity,
     val expirationTime: String
 )
-
+@Immutable
 data class WeatherDetails(
     val windSpeed: Int,
     val windGusts: Int,
@@ -93,8 +95,15 @@ data class WeatherDetails(
     val pm25: Float,
     val pm10: Float,
     val no2: Float,
-    val precipitation: Float
+    val precipitation: Float,
+    val grassPollen: PollenLevel = PollenLevel.NONE,
+    val treePollen: PollenLevel = PollenLevel.NONE,
+    val ragweedPollen: PollenLevel = PollenLevel.NONE
 )
+
+enum class PollenLevel {
+    NONE, LOW, MEDIUM, HIGH, VERY_HIGH
+}
 
 data class SunInfo(
     val sunrise: LocalTime,

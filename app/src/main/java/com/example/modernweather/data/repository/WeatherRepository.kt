@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalTime
 
 interface WeatherRepository {
-    fun getSavedLocations(): Flow<List<Location>>
-    fun getWeatherData(locationId: String): Flow<WeatherData>
+    fun getSavedLocations(languageTag: String? = null): Flow<List<Location>>
+    fun getWeatherData(locationId: String, languageTag: String? = null): Flow<WeatherData>
     fun getCurrentTime(): LocalTime
 }

@@ -39,7 +39,9 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import com.example.modernweather.data.models.SunInfo
+import com.example.modernweather.R
 import com.example.modernweather.ui.screens.TitledCard
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
 import kotlinx.coroutines.delay
@@ -78,7 +80,7 @@ fun SunCycle(sunInfo: SunInfo, viewModel: WeatherViewModel) {
     val daylightHours = totalDaylightDuration.toHours()
     val daylightMinutes = totalDaylightDuration.toMinutes() % 60
 
-    TitledCard(title = "WSCHÓD I ZACHÓD SŁOŃCA") {
+    TitledCard(title = stringResource(R.string.sun_cycle_title)) {
         Column(
             modifier = Modifier
                 .padding(16.dp)
@@ -93,7 +95,7 @@ fun SunCycle(sunInfo: SunInfo, viewModel: WeatherViewModel) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Wschód", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.sun_cycle_sunrise_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         sunrise.format(DateTimeFormatter.ofPattern("HH:mm")),
                         style = MaterialTheme.typography.bodyLarge,
@@ -102,13 +104,13 @@ fun SunCycle(sunInfo: SunInfo, viewModel: WeatherViewModel) {
                 }
 
                 Text(
-                    "${daylightHours}h ${daylightMinutes}m światła dziennego",
+                    stringResource(R.string.sun_cycle_daylight_format, daylightHours, daylightMinutes),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Zachód", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.sun_cycle_sunset_label), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(
                         sunset.format(DateTimeFormatter.ofPattern("HH:mm")),
                         style = MaterialTheme.typography.bodyLarge,
@@ -213,7 +215,7 @@ fun SunArc(progress: Float, isDay: Boolean) {
     )
 
     val starData = remember {
-        List(60) { // Reduced from 100 to 60 stars for low-end devices
+        List(60) {
             StarData(
                 position = Offset(Random.nextFloat(), Random.nextFloat()),
                 baseAlpha = Random.nextFloat() * 0.8f + 0.2f,
@@ -243,7 +245,7 @@ fun SunArc(progress: Float, isDay: Boolean) {
     LaunchedEffect(Unit) {
         val startTime = withFrameNanos { it }
         var lastUpdateTime = startTime
-        val minFrameInterval = 16_666_666L // ~60fps throttling
+        val minFrameInterval = 16_666_666L
 
         while (true) {
             withFrameNanos { frameTime ->
