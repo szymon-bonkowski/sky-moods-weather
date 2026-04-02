@@ -17,7 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import android.hardware.Sensor
+import android.hardware.SensorManager
+import androidx.compose.ui.platform.LocalContext
 import com.example.modernweather.data.models.TemperatureUnit
+import com.example.modernweather.data.models.WeatherDataSource
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
 
 @Composable
@@ -51,6 +55,11 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val settingsState by viewModel.settingsState.collectAsState()
+    val context = LocalContext.current
+    val hasBarometer = remember {
+        val sensorManager = context.getSystemService(android.content.Context.SENSOR_SERVICE) as SensorManager
+        sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) != null
+    }
 
     Scaffold(
         topBar = {
@@ -90,11 +99,19 @@ fun SettingsScreen(
                 )
             }
 
+            TitledCard(title = "ŹRÓDŁO DANYCH") {
+                WeatherSourceSelector(
+                    selectedSource = settingsState.weatherDataSource,
+                    onSourceSelected = viewModel::updateWeatherDataSource
+                )
+            }
+
             TitledCard(title = "LOKALNY NOWCAST") {
                 NowcastSettingsSection(
                     monitoringEnabled = settingsState.nowcastMonitoringEnabled,
                     notificationsEnabled = settingsState.nowcastNotificationsEnabled,
                     useTflite = settingsState.nowcastUseTfliteEnabled,
+                    hasBarometer = hasBarometer,
                     onMonitoringChanged = viewModel::updateNowcastMonitoring,
                     onNotificationsChanged = viewModel::updateNowcastNotifications,
                     onUseTfliteChanged = viewModel::updateNowcastUseTflite
@@ -132,6 +149,33 @@ fun ThemeSelector(
                 Switch(checked = isDark, onCheckedChange = { onThemeSelected(isSystem, it) })
             }
         }
+    }
+}
+
+@Composable
+fun WeatherSourceSelector(
+    selectedSource: WeatherDataSource,
+    onSourceSelected: (WeatherDataSource) -> Unit
+) {
+    Column {
+        SettingItem(label = "Użyj Open-Meteo") {
+            Switch(
+                checked = selectedSource == WeatherDataSource.OPEN_METEO,
+                onCheckedChange = { checked ->
+                    onSourceSelected(if (checked) WeatherDataSource.OPEN_METEO else WeatherDataSource.FAKE)
+                }
+            )
+        }
+        Text(
+            text = if (selectedSource == WeatherDataSource.OPEN_METEO) {
+                "Realne dane pogodowe i jakość powietrza."
+            } else {
+                "Fake data do ręcznych zmian i testów."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
     }
 }
 
@@ -185,16 +229,30 @@ private fun NowcastSettingsSection(
     monitoringEnabled: Boolean,
     notificationsEnabled: Boolean,
     useTflite: Boolean,
+    hasBarometer: Boolean,
     onMonitoringChanged: (Boolean) -> Unit,
     onNotificationsChanged: (Boolean) -> Unit,
     onUseTfliteChanged: (Boolean) -> Unit
 ) {
     Column {
         SettingItem(label = "Włącz lokalne wykrywanie frontów") {
-            Switch(checked = monitoringEnabled, onCheckedChange = onMonitoringChanged)
+            Switch(
+                checked = monitoringEnabled && hasBarometer,
+                onCheckedChange = onMonitoringChanged,
+                enabled = hasBarometer
+            )
         }
 
-        AnimatedVisibility(visible = monitoringEnabled) {
+        if (!hasBarometer) {
+            Text(
+                text = "Twoje urządzenie nie posiada barometru, który jest niezbędny do działania tej funkcji.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+        }
+
+        AnimatedVisibility(visible = monitoringEnabled && hasBarometer) {
             Column {
                 SettingItem(label = "Powiadomienia o zagrożeniu") {
                     Switch(checked = notificationsEnabled, onCheckedChange = onNotificationsChanged)

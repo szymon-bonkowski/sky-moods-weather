@@ -1,6 +1,4 @@
 package com.example.modernweather.data.models
-
-import androidx.compose.runtime.Immutable
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -40,14 +38,12 @@ enum class AlertSeverity {
     INFO, WARNING, SEVERE
 }
 
-@Immutable
 data class Location(
     val id: String,
     val name: String,
     val isCurrentLocation: Boolean = false
 )
 
-@Immutable
 data class CurrentWeather(
     val temperature: Int,
     val feelsLike: Int,
@@ -58,15 +54,14 @@ data class CurrentWeather(
     val temperatureComparison: String = ""
 )
 
-@Immutable
 data class HourlyForecast(
     val time: LocalTime,
     val temperature: Int,
     val conditionEnum: WeatherCondition,
-    val precipitationChance: Int
+    val precipitationChance: Int,
+    val isCurrent: Boolean = false
 )
 
-@Immutable
 data class DailyForecast(
     val date: LocalDate,
     val highTemp: Int,
@@ -75,7 +70,6 @@ data class DailyForecast(
     val precipitationChance: Int
 )
 
-@Immutable
 data class WeatherAlert(
     val id: String,
     val title: String,
@@ -84,7 +78,6 @@ data class WeatherAlert(
     val expirationTime: String
 )
 
-@Immutable
 data class WeatherDetails(
     val windSpeed: Int,
     val windGusts: Int,
@@ -99,10 +92,10 @@ data class WeatherDetails(
     val airQualityIndex: Int,
     val pm25: Float,
     val pm10: Float,
-    val no2: Float
+    val no2: Float,
+    val precipitation: Float
 )
 
-@Immutable
 data class SunInfo(
     val sunrise: LocalTime,
     val sunset: LocalTime

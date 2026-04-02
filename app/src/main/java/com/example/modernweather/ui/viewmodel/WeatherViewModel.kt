@@ -4,16 +4,32 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.modernweather.data.models.*
+import com.example.modernweather.data.models.Location
+import com.example.modernweather.data.models.TemperatureUnit
+import com.example.modernweather.data.models.WeatherData
+import com.example.modernweather.data.models.WeatherDataSource
 import com.example.modernweather.data.repository.FakeWeatherRepository
+import com.example.modernweather.data.repository.OpenMeteoWeatherRepository
 import com.example.modernweather.data.repository.SettingsRepository
 import com.example.modernweather.data.repository.WeatherRepository
 import com.example.modernweather.nowcast.data.NowcastRepository
 import com.example.modernweather.nowcast.model.NowcastAssessment
 import com.example.modernweather.nowcast.worker.NowcastScheduler
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import java.time.LocalTime
 
 data class LocationsUiState(
     val isLoading: Boolean = true,
@@ -33,7 +49,8 @@ data class SettingsUiState(
     val isDarkTheme: Boolean = false,
     val nowcastMonitoringEnabled: Boolean = true,
     val nowcastNotificationsEnabled: Boolean = true,
-    val nowcastUseTfliteEnabled: Boolean = true
+    val nowcastUseTfliteEnabled: Boolean = true,
+    val weatherDataSource: WeatherDataSource = WeatherDataSource.FAKE
 )
 
 class WeatherViewModel(application: Application) : ViewModel() {
@@ -42,12 +59,27 @@ class WeatherViewModel(application: Application) : ViewModel() {
         lateinit var Factory: ViewModelProvider.Factory
     }
 
-    private val weatherRepository: WeatherRepository = FakeWeatherRepository()
-    private val settingsRepository: SettingsRepository = SettingsRepository(application)
-    private val nowcastRepository: NowcastRepository = NowcastRepository(application)
+    private val settingsRepository = SettingsRepository(application)
+    private val nowcastRepository = NowcastRepository(application)
+    private val fakeWeatherRepository = FakeWeatherRepository()
+    private val openMeteoWeatherRepository = OpenMeteoWeatherRepository()
+
+    private var weatherRepository: WeatherRepository = fakeWeatherRepository
     private val applicationContext = application.applicationContext
     private var weatherDetailJob: Job? = null
     private var weatherDetailLocationId: String? = null
+
+    private val weatherSourceJob = settingsRepository.userSettingsFlow
+        .map { it.weatherDataSource }
+        .distinctUntilChanged()
+        .onEach { source ->
+            selectWeatherRepository(source)
+            if (weatherDetailLocationId != null) {
+                reloadWeatherDetail()
+            }
+            loadSavedLocations()
+        }
+        .launchIn(viewModelScope)
 
     private val _locationsState = MutableStateFlow(LocationsUiState())
     val locationsState = _locationsState.asStateFlow()
@@ -65,14 +97,14 @@ class WeatherViewModel(application: Application) : ViewModel() {
             isDarkTheme = userSettings.isDarkTheme,
             nowcastMonitoringEnabled = nowcastSettings.monitoringEnabled,
             nowcastNotificationsEnabled = nowcastSettings.notificationsEnabled,
-            nowcastUseTfliteEnabled = nowcastSettings.useTfliteModel
+            nowcastUseTfliteEnabled = nowcastSettings.useTfliteModel,
+            weatherDataSource = userSettings.weatherDataSource
         )
-    }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = SettingsUiState()
-        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = SettingsUiState()
+    )
 
     val nowcastAssessmentState: StateFlow<NowcastAssessment> = nowcastRepository.assessmentFlow
         .stateIn(
@@ -82,7 +114,6 @@ class WeatherViewModel(application: Application) : ViewModel() {
         )
 
     init {
-        loadSavedLocations()
         viewModelScope.launch {
             val nowcastSettings = nowcastRepository.getSettings()
             if (nowcastSettings.monitoringEnabled) {
@@ -129,6 +160,12 @@ class WeatherViewModel(application: Application) : ViewModel() {
         viewModelScope.launch { settingsRepository.updateTheme(isSystem, isDark) }
     }
 
+    fun updateWeatherDataSource(source: WeatherDataSource) {
+        viewModelScope.launch {
+            settingsRepository.updateWeatherDataSource(source)
+        }
+    }
+
     fun updateNowcastMonitoring(enabled: Boolean) {
         viewModelScope.launch {
             nowcastRepository.updateMonitoringEnabled(enabled)
@@ -170,15 +207,30 @@ class WeatherViewModel(application: Application) : ViewModel() {
         }
     }
 
-    fun setTestValues(currentTime: java.time.LocalTime, sunrise: java.time.LocalTime, sunset: java.time.LocalTime) {
-        (weatherRepository as? FakeWeatherRepository)?.setTestValues(currentTime, sunrise, sunset)
+    fun setTestValues(currentTime: LocalTime, sunrise: LocalTime, sunset: LocalTime) {
+        fakeWeatherRepository.setTestValues(currentTime, sunrise, sunset)
     }
 
     fun resetToRealTime() {
-        (weatherRepository as? FakeWeatherRepository)?.resetToRealTime()
+        fakeWeatherRepository.resetToRealTime()
     }
 
-    fun getCurrentTime(): java.time.LocalTime {
-        return java.time.LocalTime.now()
+    fun getCurrentTime(): LocalTime {
+        return weatherRepository.getCurrentTime()
+    }
+
+    private fun selectWeatherRepository(source: WeatherDataSource) {
+        weatherRepository = when (source) {
+            WeatherDataSource.FAKE -> fakeWeatherRepository
+            WeatherDataSource.OPEN_METEO -> openMeteoWeatherRepository
+        }
+    }
+
+    private fun reloadWeatherDetail() {
+        val locationId = weatherDetailLocationId ?: return
+        weatherDetailJob?.cancel()
+        weatherDetailJob = null
+        _weatherDetailState.value = WeatherDetailUiState.Loading
+        loadWeatherData(locationId)
     }
 }

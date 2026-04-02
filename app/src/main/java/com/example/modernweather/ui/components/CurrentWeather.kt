@@ -3,9 +3,11 @@ package com.example.modernweather.ui.components
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -24,6 +26,9 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.ExperimentalTextApi
@@ -53,7 +58,8 @@ fun CurrentWeatherSection(
     current: CurrentWeather,
     hourly: List<HourlyForecast>,
     unit: TemperatureUnit,
-    pauseEffects: Boolean = false
+    pauseEffects: Boolean = false,
+    currentTime: java.time.LocalTime = java.time.LocalTime.now()
 ) {
     val displayTemp = if (unit == TemperatureUnit.CELSIUS) current.temperature else toFahrenheit(current.temperature)
     val textMeasurer = rememberTextMeasurer()
@@ -156,20 +162,25 @@ fun CurrentWeatherSection(
 
             HourlySimpleList(
                 hourlyForecast = hourly,
-                unit = unit
+                unit = unit,
+                currentTime = currentTime
             )
         }
     }
 }
 
 @Composable
-private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: TemperatureUnit) {
+private fun HourlySimpleList(
+    hourlyForecast: List<HourlyForecast>,
+    unit: TemperatureUnit,
+    currentTime: java.time.LocalTime
+) {
     if (hourlyForecast.isEmpty()) return
 
     val timeFormatter = remember { DateTimeFormatter.ofPattern("HH:mm") }
-    val now = remember { java.time.LocalTime.now() }
+
     val currentHourIndex = remember(hourlyForecast) {
-        val index = hourlyForecast.indexOfFirst { it.time.hour == now.hour }
+        val index = hourlyForecast.indexOfFirst { it.isCurrent }
         if (index >= 0) index else 0
     }
 
@@ -185,9 +196,24 @@ private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: Tempera
         }
     }
 
+    val nestedScrollConnection = remember(currentHourIndex) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val isPullingIntoPast = available.x > 0
+                val inPast = listState.firstVisibleItemIndex < currentHourIndex
+                
+                if (isPullingIntoPast && (inPast || listState.firstVisibleItemIndex == currentHourIndex)) {
+                    val resistance = 0.05f
+                    return Offset(available.x * resistance, 0f)
+                }
+                return Offset.Zero
+            }
+        }
+    }
+
     val chartShape = RoundedCornerShape(24.dp)
 
-    Box(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxWidth()
             .height(110.dp)
@@ -206,27 +232,33 @@ private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: Tempera
                 shape = chartShape
             )
     ) {
+        val itemWidth = 48.dp
+        val horizontalPadding = 16.dp
+        val availableWidth = maxWidth - (horizontalPadding * 2)
+        val exactSpacing = ((availableWidth - (itemWidth * 6)) / 5).coerceAtLeast(4.dp)
+
         LazyRow(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .nestedScroll(nestedScrollConnection),
             state = listState,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(exactSpacing),
+            contentPadding = PaddingValues(horizontal = horizontalPadding)
         ) {
-            items(
+            itemsIndexed(
                 items = hourlyForecast,
-                key = { forecast -> forecast.time.toString() },
-                contentType = { "hourly-item" }
-            ) { forecast ->
+                key = { index, forecast -> "$index-${forecast.time}" },
+                contentType = { _, _ -> "hourly-item" }
+            ) { index, forecast ->
                 val displayTemp = if (unit == TemperatureUnit.CELSIUS) forecast.temperature else toFahrenheit(forecast.temperature)
-                val isNow = forecast.time.hour == now.hour
+                val isNow = index == currentHourIndex
                 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
-                        .width(52.dp)
+                        .width(itemWidth)
                         .then(
                             if (isNow) {
                                 Modifier
@@ -262,7 +294,11 @@ private fun HourlySimpleList(hourlyForecast: List<HourlyForecast>, unit: Tempera
 
 @OptIn(ExperimentalTextApi::class)
 @Composable
-private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: TemperatureUnit) {
+private fun HourlyWaveChart(
+    hourlyForecast: List<HourlyForecast>,
+    unit: TemperatureUnit,
+    currentTime: java.time.LocalTime
+) {
     if (hourlyForecast.isEmpty()) return
 
     val textMeasurer = rememberTextMeasurer()
@@ -369,8 +405,8 @@ private fun HourlyWaveChart(hourlyForecast: List<HourlyForecast>, unit: Temperat
             edgePaddingPx * 2 + pointSpacingPx * (hourlyForecast.size - 1).coerceAtLeast(1)
         )
         val chartWidthDp = with(density) { chartWidthPx.toDp() }
-        val currentHourIndex = remember(hourlyForecast) {
-            hourlyForecast.indexOfFirst { it.time.hour == java.time.LocalTime.now().hour }
+        val currentHourIndex = remember(hourlyForecast, currentTime) {
+            hourlyForecast.indexOfFirst { it.time.hour == currentTime.hour }
                 .takeIf { it >= 0 } ?: 0
         }
         val initialScrollPx = remember(viewportWidthPx, chartWidthPx, pointSpacingPx, currentHourIndex) {

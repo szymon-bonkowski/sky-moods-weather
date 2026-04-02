@@ -14,8 +14,12 @@ class FakeWeatherRepository : WeatherRepository {
     var testSunrise: LocalTime? = LocalTime.of(5, 0)
     var testSunset: LocalTime? = LocalTime.of(22, 31)
 
-    private fun getCurrentTime(): LocalTime {
+    private fun resolveCurrentTime(): LocalTime {
         return testTime ?: LocalTime.now()
+    }
+
+    override fun getCurrentTime(): LocalTime {
+        return resolveCurrentTime()
     }
 
     fun setTestValues(currentTime: LocalTime, sunrise: LocalTime, sunset: LocalTime) {
@@ -53,7 +57,7 @@ class FakeWeatherRepository : WeatherRepository {
     }
 
     private fun generateFakeDataFor(location: Location): WeatherData {
-        val now = getCurrentTime()
+        val now = resolveCurrentTime()
         val today = LocalDate.now()
 
         return WeatherData(
@@ -74,8 +78,9 @@ class FakeWeatherRepository : WeatherRepository {
                 severity = AlertSeverity.WARNING,
                 expirationTime = "wygasa o 2:00"
             ),
-            hourlyForecast = (0..23).map { hour ->
-                val time = LocalTime.of(hour, 0)
+            hourlyForecast = (-5..24).map { offset ->
+                val time = now.withMinute(0).withSecond(0).withNano(0).plusHours(offset.toLong())
+                val hour = time.hour
                 HourlyForecast(
                     time = time,
                     temperature = when (hour) {
@@ -91,7 +96,8 @@ class FakeWeatherRepository : WeatherRepository {
                         in 17..20 -> WeatherCondition.DAY_PARTLY_CLOUDY
                         else -> WeatherCondition.DAY_CLOUDY
                     },
-                    precipitationChance = if (hour in 0..3 || hour > 22) Random.nextInt(40, 90) else Random.nextInt(0, 15)
+                    precipitationChance = if (hour in 0..3 || hour > 22) Random.nextInt(40, 90) else Random.nextInt(0, 15),
+                    isCurrent = offset == 0
                 )
             },
             dailyForecast = listOf(
@@ -117,7 +123,8 @@ class FakeWeatherRepository : WeatherRepository {
                 airQualityIndex = 41,
                 pm25 = 12.5f,
                 pm10 = 24.3f,
-                no2 = 18.7f
+                no2 = 18.7f,
+                precipitation = 2.5f
             ),
             sunInfo = SunInfo(
                 sunrise = testSunrise ?: LocalTime.of(4, 20),

@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RadarScreen(onNavigateBack: () -> Unit) {
+    // TODO: wire a real radar source if Open-Meteo or another provider is added later.
     Scaffold(
         topBar = {
             TopAppBar(
@@ -41,8 +42,9 @@ fun RadarScreen(onNavigateBack: () -> Unit) {
                 .padding(padding),
             contentAlignment = Alignment.Center
         ) {
+            // TODO: replace this placeholder with a real radar view.
             Text(
-                text = "TODO",
+                text = "Placeholder",
                 style = MaterialTheme.typography.headlineLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
             )

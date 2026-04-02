@@ -32,6 +32,9 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.hardware.Sensor
+import android.hardware.SensorManager
+import androidx.compose.ui.platform.LocalContext
 import com.example.modernweather.R
 import com.example.modernweather.data.models.*
 import com.example.modernweather.nowcast.model.LocalRiskLevel
@@ -88,7 +91,8 @@ fun WeatherDetailScreen(
                     data = state.weatherData,
                     unit = settingsState.temperatureUnit,
                     viewModel = viewModel,
-                    onNavigateToRadar = onNavigateToRadar
+                    onNavigateToRadar = onNavigateToRadar,
+                    currentTime = viewModel.getCurrentTime()
                 )
             }
         }
@@ -96,7 +100,19 @@ fun WeatherDetailScreen(
 }
 
 @Composable
-fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherViewModel, onNavigateToRadar: () -> Unit) {
+fun WeatherPage(
+    data: WeatherData,
+    unit: TemperatureUnit,
+    viewModel: WeatherViewModel,
+    onNavigateToRadar: () -> Unit,
+    currentTime: java.time.LocalTime
+) {
+    val context = LocalContext.current
+    val hasBarometer = remember {
+        val sensorManager = context.getSystemService(android.content.Context.SENSOR_SERVICE) as SensorManager
+        sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) != null
+    }
+
     val stableSunInfo = remember(data.location.id) { data.sunInfo }
     val listState = rememberLazyListState()
     val isCurrentWeatherVisible by remember {
@@ -126,7 +142,8 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
                 current = stableCurrentWeather,
                 hourly = stableHourlyForecast,
                 unit = unit,
-                pauseEffects = !shouldRunHeavyEffects
+                pauseEffects = !shouldRunHeavyEffects,
+                currentTime = currentTime
             )
         }
 
@@ -156,8 +173,10 @@ fun WeatherPage(data: WeatherData, unit: TemperatureUnit, viewModel: WeatherView
             }
         }
 
-        item(key = "local_nowcast_status", contentType = "nowcast") {
-            LocalNowcastCardItem(viewModel = viewModel)
+        if (hasBarometer) {
+            item(key = "local_nowcast_status", contentType = "nowcast") {
+                LocalNowcastCardItem(viewModel = viewModel)
+            }
         }
 
         item(key = "radar", contentType = "radar") {
@@ -280,6 +299,10 @@ fun DetailsGrid(details: WeatherDetails) {
             Row(Modifier.fillMaxWidth()) {
                 DetailItem("Zachmurzenie", "${details.cloudCover}%", Icons.Default.Cloud, Modifier.weight(1f))
                 DetailItem("Widoczność", details.visibility, Icons.Default.Visibility, Modifier.weight(1f))
+            }
+            Row(Modifier.fillMaxWidth()) {
+                DetailItem("Opady", "${details.precipitation} mm", Icons.Default.Water, Modifier.weight(1f))
+                DetailItem("Punkt rosy", "${details.dewPoint}°", Icons.Default.Thermostat, Modifier.weight(1f))
             }
         }
     }
@@ -416,7 +439,8 @@ fun AqiComponentRow(label: String, value: Float, maxValue: Float, animate: Boole
 
 @Composable
 fun RadarCard(onClick: () -> Unit) {
-    TitledCard(title = "RADAR") {
+    // TODO: replace this placeholder card when a real radar data source exists.
+    TitledCard(title = "RADAR (TODO)") {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -439,7 +463,7 @@ fun RadarCard(onClick: () -> Unit) {
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Icon(Icons.Default.Radar, contentDescription = null, tint = Color.White)
-                    Text("Otwórz mapę radaru", color = Color.White, fontWeight = FontWeight.Bold)
+                    Text("Placeholder", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             }
         }
