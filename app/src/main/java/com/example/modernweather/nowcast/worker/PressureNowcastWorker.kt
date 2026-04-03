@@ -38,55 +38,64 @@ class PressureNowcastWorker(
 ) : CoroutineWorker(appContext, workerParams) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.Default) {
-        val repository = NowcastRepository(applicationContext)
-        val settings = repository.getSettings()
-        if (!settings.monitoringEnabled) return@withContext Result.success()
-        if (!hasPressureSensor()) return@withContext Result.success()
+        try {
+            val repository = NowcastRepository(applicationContext)
+            val settings = repository.getSettings()
+            if (!settings.monitoringEnabled) return@withContext Result.success()
+            if (!hasPressureSensor()) return@withContext Result.success()
 
-        val pressureSample = readPressureOnce() ?: return@withContext Result.retry()
-        val now = System.currentTimeMillis()
-        val existingHistory = repository.getPressureHistory()
-        val sanitizedPressure = sanitizePressureSample(
-            newPressure = pressureSample,
-            previousPressure = existingHistory.lastOrNull()?.pressureHpa
-        ) ?: return@withContext Result.success()
+            val pressureSample = readPressureOnce() ?: return@withContext Result.retry()
+            val now = System.currentTimeMillis()
+            val existingHistory = repository.getPressureHistory()
+            val sanitizedPressure = sanitizePressureSample(
+                newPressure = pressureSample,
+                previousPressure = existingHistory.lastOrNull()?.pressureHpa
+            ) ?: return@withContext Result.success()
 
-        val history = repository.appendPressureSample(
-            RawPressureSample(
-                timestampEpochMillis = now,
-                pressureHpa = sanitizedPressure
+            val history = repository.appendPressureSample(
+                RawPressureSample(
+                    timestampEpochMillis = now,
+                    pressureHpa = sanitizedPressure
+                )
             )
-        )
 
-        val kalman = KalmanPressureFilter()
-        val filtered = history.map {
-            it.copy(pressureHpa = kalman.update(it.pressureHpa))
-        }
+            val kalman = KalmanPressureFilter()
+            val filtered = history.map {
+                it.copy(pressureHpa = kalman.update(it.pressureHpa))
+            }
 
-        val predictor = if (settings.useTfliteModel) {
-            TfliteNowcastPredictor.tryCreate(applicationContext)
-        } else {
-            null
-        }
-        val engine = NowcastEngine()
-        val assessment = engine.evaluate(
-            history = filtered,
-            settings = settings,
-            predictor = predictor
-        )
-        predictor?.close()
-
-        repository.saveAssessment(assessment)
-        maybeNotify(assessment, settings.notificationCooldownMinutes, repository)
-        if (settings.monitoringEnabled) {
-            NowcastScheduler.schedule(
-                context = applicationContext,
-                intervalMinutes = settings.sampleIntervalMinutes,
-                immediate = false
+            val predictor = if (settings.useTfliteModel) {
+                TfliteNowcastPredictor.tryCreate(applicationContext)
+            } else {
+                null
+            }
+            val engine = NowcastEngine()
+            val assessment = engine.evaluate(
+                history = filtered,
+                settings = settings,
+                predictor = predictor
             )
-        }
+            predictor?.close()
 
-        Result.success()
+            repository.saveAssessment(assessment)
+            maybeNotify(assessment, settings.notificationCooldownMinutes, repository)
+
+            // Only reschedule if monitoring is still enabled AFTER all work is done
+            // This prevents infinite reschedule loops
+            val currentSettings = repository.getSettings()
+            if (currentSettings.monitoringEnabled && !isStopped) {
+                NowcastScheduler.schedule(
+                    context = applicationContext,
+                    intervalMinutes = currentSettings.sampleIntervalMinutes,
+                    immediate = false
+                )
+            }
+
+            Result.success()
+        } catch (e: Exception) {
+            // Log error but don't reschedule on failure to prevent infinite retry loops
+            Result.failure()
+        }
     }
 
     private fun hasPressureSensor(): Boolean {

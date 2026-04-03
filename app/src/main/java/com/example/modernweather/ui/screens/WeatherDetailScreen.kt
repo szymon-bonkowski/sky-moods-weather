@@ -115,7 +115,7 @@ fun WeatherPage(
     currentTime: java.time.LocalTime
 ) {
     val context = LocalContext.current
-    val hasBarometer = remember {
+    val hasBarometer = remember(context) {
         val sensorManager = context.getSystemService(android.content.Context.SENSOR_SERVICE) as SensorManager
         sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) != null
     }
@@ -411,19 +411,23 @@ fun AqiComponentRow(label: String, value: Float, maxValue: Float, animate: Boole
             )
         }
         Spacer(modifier = Modifier.height(6.dp))
-        
-        val targetProgress = (value / (maxValue * 1.5f)).coerceIn(0.05f, 1f)
+
+        val targetProgress = remember(value, maxValue) {
+            (value / (maxValue * 1.5f)).coerceIn(0.05f, 1f)
+        }
         val progress by animateFloatAsState(
             targetValue = if (animate) targetProgress else 0.05f,
             animationSpec = tween(durationMillis = 1500),
             label = "aqi_bar_$label"
         )
 
-        val barColor = when {
-            value <= maxValue * 0.5f -> AqiGood
-            value <= maxValue -> AqiModerate
-            value <= maxValue * 1.5f -> AqiUnhealthy
-            else -> AqiVeryUnhealthy
+        val barColor = remember(value, maxValue) {
+            when {
+                value <= maxValue * 0.5f -> AqiGood
+                value <= maxValue -> AqiModerate
+                value <= maxValue * 1.5f -> AqiUnhealthy
+                else -> AqiVeryUnhealthy
+            }
         }
 
         Box(
@@ -586,22 +590,24 @@ fun SunCycleSection(sunInfo: SunInfo, viewModel: WeatherViewModel) {
 fun AlertCard(alert: WeatherAlert) {
     val isDark = isSystemInDarkTheme()
 
-    val (containerColor, contentColor, icon) = when (alert.severity) {
-        AlertSeverity.INFO -> Triple(
-            if (isDark) Color(0xFF0F2942) else Color(0xFFE8F2FA),
-            if (isDark) Color(0xFF7CB6F5) else Color(0xFF104A82),
-            Icons.Default.Info
-        )
-        AlertSeverity.WARNING -> Triple(
-            if (isDark) Color(0xFF3D2E1A) else Color(0xFFFDF3E1),
-            if (isDark) Color(0xFFF3AF5D) else Color(0xFF8C500A),
-            Icons.Default.Warning
-        )
-        AlertSeverity.SEVERE -> Triple(
-            if (isDark) Color(0xFF451E1E) else Color(0xFFFCE8E8),
-            if (isDark) Color(0xFFF28B8B) else Color(0xFF9E1B1B),
-            Icons.Default.Dangerous
-        )
+    val (containerColor, contentColor, icon) = remember(alert.severity, isDark) {
+        when (alert.severity) {
+            AlertSeverity.INFO -> Triple(
+                if (isDark) Color(0xFF0F2942) else Color(0xFFE8F2FA),
+                if (isDark) Color(0xFF7CB6F5) else Color(0xFF104A82),
+                Icons.Default.Info
+            )
+            AlertSeverity.WARNING -> Triple(
+                if (isDark) Color(0xFF3D2E1A) else Color(0xFFFDF3E1),
+                if (isDark) Color(0xFFF3AF5D) else Color(0xFF8C500A),
+                Icons.Default.Warning
+            )
+            AlertSeverity.SEVERE -> Triple(
+                if (isDark) Color(0xFF451E1E) else Color(0xFFFCE8E8),
+                if (isDark) Color(0xFFF28B8B) else Color(0xFF9E1B1B),
+                Icons.Default.Dangerous
+            )
+        }
     }
 
     Card(

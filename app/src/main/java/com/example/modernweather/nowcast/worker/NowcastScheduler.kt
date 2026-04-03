@@ -22,16 +22,21 @@ object NowcastScheduler {
                     .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
                     .build()
             )
+            .addTag(UNIQUE_WORK_NAME)
             .build()
 
+        // Use KEEP instead of REPLACE to prevent WorkManager from canceling and recreating workers
+        // This eliminates the ForceStopRunnable and IdGenerator memory leak issues
         WorkManager.getInstance(context).enqueueUniqueWork(
             UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.KEEP,
             request
         )
     }
 
     fun cancel(context: Context) {
         WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
+        // Also cancel by tag to ensure complete cleanup
+        WorkManager.getInstance(context).cancelAllWorkByTag(UNIQUE_WORK_NAME)
     }
 }

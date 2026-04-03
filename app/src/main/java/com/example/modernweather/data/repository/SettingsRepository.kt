@@ -15,6 +15,7 @@ import com.example.modernweather.data.models.UserSettings
 import com.example.modernweather.data.models.WeatherDataSource
 import java.io.IOException
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
@@ -31,6 +32,7 @@ class SettingsRepository(context: Context) {
         private val APP_LANGUAGE_KEY = stringPreferencesKey("app_language")
     }
 
+    // Use distinctUntilChanged to prevent unnecessary recompositions and I/O
     val userSettingsFlow: Flow<UserSettings> = dataStore.data
         .catch { exception ->
             if (exception is IOException) {
@@ -58,6 +60,7 @@ class SettingsRepository(context: Context) {
             appLanguage = appLanguage
         )
     }
+        .distinctUntilChanged()
 
     suspend fun updateTemperatureUnit(temperatureUnit: TemperatureUnit) {
         dataStore.edit { preferences ->

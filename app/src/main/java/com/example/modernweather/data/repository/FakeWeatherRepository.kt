@@ -7,6 +7,7 @@ import com.example.modernweather.utils.WeatherTextFormatter
 import com.example.modernweather.utils.localized
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import java.time.LocalDate
 import java.time.LocalTime
@@ -19,6 +20,8 @@ class FakeWeatherRepository(
     var testTime: LocalTime? = LocalTime.of(22, 15)
     var testSunrise: LocalTime? = LocalTime.of(5, 0)
     var testSunset: LocalTime? = LocalTime.of(22, 31)
+
+    private val weatherDataCache = mutableMapOf<String, MutableStateFlow<WeatherData?>>()
 
     private fun resolveCurrentTime(): LocalTime {
         return testTime ?: LocalTime.now()
@@ -56,10 +59,19 @@ class FakeWeatherRepository(
         delay(1500)
         val location = fakeLocations.first { it.id == locationId }
 
-        while (true) {
-            emit(generateFakeDataFor(location, localizedContext))
-            delay(60_000L)
-            testTime = (testTime ?: LocalTime.now()).plusMinutes(1)
+        // Emit initial data
+        emit(generateFakeDataFor(location, localizedContext))
+
+        // Cache the flow for this location
+        val cacheFlow = weatherDataCache.getOrPut(locationId) {
+            MutableStateFlow<WeatherData?>(null)
+        }
+
+        // Collect from cache for subsequent updates (if any)
+        cacheFlow.collect { cached ->
+            if (cached != null) {
+                emit(cached)
+            }
         }
     }
 

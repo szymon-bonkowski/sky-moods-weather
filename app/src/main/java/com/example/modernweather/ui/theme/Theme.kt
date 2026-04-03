@@ -10,6 +10,8 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -55,11 +57,25 @@ fun ModernWeatherTheme(
     }
     val view = LocalView.current
     if (!view.isInEditMode) {
+        val backgroundArgb = colorScheme.background.toArgb()
+        val lastBackgroundArgb = remember { mutableIntStateOf(0) }
+        val lastLightStatusBars = remember { mutableIntStateOf(-1) }
+
         SideEffect {
             val window = (view.context as Activity).window
-            window.setBackgroundDrawable(ColorDrawable(colorScheme.background.toArgb()))
-            window.statusBarColor = colorScheme.background.toArgb()
-            WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+            val isLightStatusBars = if (darkTheme) 0 else 1
+
+            // Only update if values actually changed
+            if (lastBackgroundArgb.intValue != backgroundArgb) {
+                window.setBackgroundDrawable(ColorDrawable(backgroundArgb))
+                window.statusBarColor = backgroundArgb
+                lastBackgroundArgb.intValue = backgroundArgb
+            }
+
+            if (lastLightStatusBars.intValue != isLightStatusBars) {
+                WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+                lastLightStatusBars.intValue = isLightStatusBars
+            }
         }
     }
 
