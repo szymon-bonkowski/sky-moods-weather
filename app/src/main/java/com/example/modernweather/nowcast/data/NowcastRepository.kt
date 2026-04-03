@@ -15,6 +15,7 @@ import com.example.modernweather.nowcast.model.NowcastAssessment
 import com.example.modernweather.nowcast.model.NowcastSettings
 import com.example.modernweather.nowcast.model.RawPressureSample
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -23,37 +24,42 @@ private val Context.nowcastStore: DataStore<Preferences> by preferencesDataStore
 class NowcastRepository(context: Context) {
     private val dataStore = context.nowcastStore
 
-    val settingsFlow: Flow<NowcastSettings> = dataStore.data.map { preferences ->
-        NowcastSettings(
-            monitoringEnabled = preferences[MONITORING_ENABLED_KEY] ?: true,
-            notificationsEnabled = preferences[NOTIFICATIONS_ENABLED_KEY] ?: true,
-            useTfliteModel = preferences[USE_TFLITE_KEY] ?: true,
-            sampleIntervalMinutes = (preferences[SAMPLE_INTERVAL_MINUTES_KEY] ?: 10).coerceIn(5, 30),
-            notificationCooldownMinutes = (preferences[NOTIFICATION_COOLDOWN_MINUTES_KEY] ?: 120).coerceIn(30, 720)
-        )
-    }
+    // Use distinctUntilChanged to prevent unnecessary recompositions and I/O
+    val settingsFlow: Flow<NowcastSettings> = dataStore.data
+        .map { preferences ->
+            NowcastSettings(
+                monitoringEnabled = preferences[MONITORING_ENABLED_KEY] ?: true,
+                notificationsEnabled = preferences[NOTIFICATIONS_ENABLED_KEY] ?: true,
+                useTfliteModel = preferences[USE_TFLITE_KEY] ?: true,
+                sampleIntervalMinutes = (preferences[SAMPLE_INTERVAL_MINUTES_KEY] ?: 10).coerceIn(5, 30),
+                notificationCooldownMinutes = (preferences[NOTIFICATION_COOLDOWN_MINUTES_KEY] ?: 120).coerceIn(30, 720)
+            )
+        }
+        .distinctUntilChanged()
 
-    val assessmentFlow: Flow<NowcastAssessment> = dataStore.data.map { preferences ->
-        val risk = runCatching {
-            LocalRiskLevel.valueOf(preferences[LAST_RISK_LEVEL_KEY] ?: LocalRiskLevel.LOW.name)
-        }.getOrDefault(LocalRiskLevel.LOW)
+    val assessmentFlow: Flow<NowcastAssessment> = dataStore.data
+        .map { preferences ->
+            val risk = runCatching {
+                LocalRiskLevel.valueOf(preferences[LAST_RISK_LEVEL_KEY] ?: LocalRiskLevel.LOW.name)
+            }.getOrDefault(LocalRiskLevel.LOW)
 
-        val modelScore = (preferences[MODEL_SCORE_KEY] ?: -1f).takeIf { it >= 0f }
+            val modelScore = (preferences[MODEL_SCORE_KEY] ?: -1f).takeIf { it >= 0f }
 
-        NowcastAssessment(
-            evaluatedAtEpochMillis = preferences[LAST_EVALUATED_AT_KEY] ?: 0L,
-            latestPressureHpa = (preferences[LATEST_PRESSURE_KEY] ?: -1f).takeIf { it >= 0f },
-            pressureDrop3h = preferences[PRESSURE_DROP_3H_KEY] ?: 0f,
-            slopeHpaPerHour = preferences[SLOPE_HPA_H_KEY] ?: 0f,
-            sampleCount = preferences[SAMPLE_COUNT_KEY] ?: 0,
-            heuristicScore = preferences[HEURISTIC_SCORE_KEY] ?: 0f,
-            modelScore = modelScore,
-            fusedScore = preferences[FUSED_SCORE_KEY] ?: 0f,
-            riskLevel = risk,
-            reason = preferences[REASON_KEY] ?: "Brak danych do oceny lokalnej tendencji barycznej.",
-            monitoringEnabled = preferences[MONITORING_ENABLED_KEY] ?: true
-        )
-    }
+            NowcastAssessment(
+                evaluatedAtEpochMillis = preferences[LAST_EVALUATED_AT_KEY] ?: 0L,
+                latestPressureHpa = (preferences[LATEST_PRESSURE_KEY] ?: -1f).takeIf { it >= 0f },
+                pressureDrop3h = preferences[PRESSURE_DROP_3H_KEY] ?: 0f,
+                slopeHpaPerHour = preferences[SLOPE_HPA_H_KEY] ?: 0f,
+                sampleCount = preferences[SAMPLE_COUNT_KEY] ?: 0,
+                heuristicScore = preferences[HEURISTIC_SCORE_KEY] ?: 0f,
+                modelScore = modelScore,
+                fusedScore = preferences[FUSED_SCORE_KEY] ?: 0f,
+                riskLevel = risk,
+                reason = preferences[REASON_KEY] ?: "Brak danych do oceny lokalnej tendencji barycznej.",
+                monitoringEnabled = preferences[MONITORING_ENABLED_KEY] ?: true
+            )
+        }
+        .distinctUntilChanged()
 
     suspend fun getSettings(): NowcastSettings = settingsFlow.first()
 
@@ -95,6 +101,7 @@ class NowcastRepository(context: Context) {
     }
 
     suspend fun saveAssessment(assessment: NowcastAssessment) {
+        // Batch all writes in a single transaction to reduce I/O operations
         dataStore.edit { preferences ->
             preferences[LAST_EVALUATED_AT_KEY] = assessment.evaluatedAtEpochMillis
             preferences[LATEST_PRESSURE_KEY] = assessment.latestPressureHpa ?: -1f
