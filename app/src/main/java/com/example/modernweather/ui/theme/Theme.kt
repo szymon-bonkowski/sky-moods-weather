@@ -2,6 +2,7 @@ package com.example.modernweather.ui.theme
 
 import android.app.Activity
 import android.os.Build
+import android.graphics.drawable.ColorDrawable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -56,6 +57,7 @@ fun ModernWeatherTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
+            window.setBackgroundDrawable(ColorDrawable(colorScheme.background.toArgb()))
             window.statusBarColor = colorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }

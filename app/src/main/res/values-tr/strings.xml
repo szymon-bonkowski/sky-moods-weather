@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_system_default">Sistem varsayılanı</string>
+    <string name="language_polish">Lehçe</string>
+    <string name="language_english">İngilizce</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_spanish">İspanyolca</string>
+    <string name="language_italian">İtalyanca</string>
+    <string name="settings_title">Ayarlar</string>
+    <string name="settings_section_units">Birimler</string>
+    <string name="settings_section_appearance">Görünüm</string>
+    <string name="settings_section_data_source">Veri kaynağı</string>
+    <string name="settings_section_nowcast">Yerel nowcast</string>
+    <string name="settings_section_language">Dil</string>
+    <string name="settings_temperature_label">Sıcaklık</string>
+    <string name="settings_system_theme_label">Sistem teması</string>
+    <string name="settings_dark_theme_label">Karanlık mod</string>
+    <string name="settings_use_open_meteo">Open-Meteo kullan</string>
+    <string name="settings_open_meteo_description">Gerçek hava durumu ve hava kalitesi verileri.</string>
+    <string name="settings_fake_data_description">Elle değişiklikler ve test için sahte veriler.</string>
+    <string name="settings_enable_local_nowcast">Yerel cephe algılamayı etkinleştir</string>
+    <string name="settings_no_barometer_warning">Cihazınızda bu özellik için gerekli olan bir barometre yok.</string>
+    <string name="settings_nowcast_notifications_label">Tehlike bildirimleri</string>
+    <string name="settings_nowcast_ml_model_label">ML modeli (TensorFlow Lite)</string>
+    <string name="locations_title">Konumlarım</string>
+    <string name="locations_settings_content_description">Ayarlar</string>
+    <string name="locations_error_prefix">Hata: %1$s</string>
+    <string name="locations_saved_header">KAYDEDİLEN KONUMALAR</string>
+    <string name="locations_search_hint">Bir yer veya posta kodu ara</string>
+    <string name="locations_search_content_description">Ara</string>
+    <string name="locations_location_content_description">Konum</string>
+    <string name="weather_detail_load_error_format">Hava durumu verisi yüklenemedi: %1$s</string>
+    <string name="weather_detail_error_unknown">Bilinmeyen hata</string>
+    <string name="nowcast_notification_title">Yerel hava durumu uyarısı</string>
+    <string name="nowcast_channel_name">Yerel hava durumu uyarıları</string>
+    <string name="nowcast_channel_description">Fırtına veya cepheleri gösterebilecek ani basınç değişiklikleri için uyarılar.</string>
+</resources>

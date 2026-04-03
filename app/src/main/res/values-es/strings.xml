@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="language_system_default">Predeterminado del sistema</string>
+    <string name="language_polish">Polaco</string>
+    <string name="language_english">Inglés</string>
+    <string name="language_turkish">Turco</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_italian">Italiano</string>
+    <string name="settings_title">Ajustes</string>
+    <string name="settings_section_units">Unidades</string>
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_section_data_source">Fuente de datos</string>
+    <string name="settings_section_language">Idioma</string>
+    <string name="settings_temperature_label">Temperatura</string>
+    <string name="settings_system_theme_label">Tema del sistema</string>
+    <string name="settings_dark_theme_label">Modo oscuro</string>
+    <string name="settings_use_open_meteo">Usar Open-Meteo</string>
+    <string name="settings_open_meteo_description">Datos reales del clima y calidad del aire.</string>
+    <string name="settings_fake_data_description">Datos falsos para cambios manuales y pruebas.</string>
+    <string name="settings_enable_local_nowcast">Activar detección local de frentes</string>
+    <string name="settings_no_barometer_warning">Tu dispositivo no tiene barómetro, que es necesario para esta función.</string>
+    <string name="settings_nowcast_notifications_label">Notificaciones de peligro</string>
+    <string name="settings_nowcast_ml_model_label">Modelo ML (TensorFlow Lite)</string>
+    <string name="locations_title">Mis ubicaciones</string>
+    <string name="locations_settings_content_description">Ajustes</string>
+    <string name="locations_error_prefix">Error: %1$s</string>
+    <string name="locations_saved_header">UBICACIONES GUARDADAS</string>
+    <string name="locations_search_hint">Buscar un lugar o código postal</string>
+    <string name="locations_search_content_description">Buscar</string>
+    <string name="locations_location_content_description">Ubicación</string>
+    <string name="weather_detail_load_error_format">No se pudieron cargar los datos meteorológicos: %1$s</string>
+    <string name="weather_detail_error_unknown">Error desconocido</string>
+    <string name="nowcast_notification_title">Alerta meteorológica local</string>
+    <string name="nowcast_channel_name">Alertas meteorológicas locales</string>
+    <string name="nowcast_channel_description">Alertas sobre cambios bruscos de presión que pueden indicar tormentas o frentes.</string>
+</resources>

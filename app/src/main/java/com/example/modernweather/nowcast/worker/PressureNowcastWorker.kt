@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.modernweather.R
+import com.example.modernweather.data.repository.SettingsRepository
 import com.example.modernweather.nowcast.analysis.KalmanPressureFilter
 import com.example.modernweather.nowcast.analysis.NowcastEngine
 import com.example.modernweather.nowcast.data.NowcastRepository
@@ -21,8 +22,10 @@ import com.example.modernweather.nowcast.ml.TfliteNowcastPredictor
 import com.example.modernweather.nowcast.model.LocalRiskLevel
 import com.example.modernweather.nowcast.model.NowcastAssessment
 import com.example.modernweather.nowcast.model.RawPressureSample
+import com.example.modernweather.utils.localized
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -113,6 +116,18 @@ class PressureNowcastWorker(
 
         if (!hasPostNotificationPermission()) return
 
+        val appLanguage = SettingsRepository(applicationContext).userSettingsFlow.first().appLanguage
+        val localizedContext = applicationContext.localized(
+            appLanguage.languageTag.takeIf { it.isNotBlank() }
+        )
+        val bodyText = assessment.latestPressureHpa?.let { pressure ->
+            localizedContext.getString(
+                R.string.nowcast_notification_body_format,
+                "%.1f".format(pressure),
+                "%.1f".format(assessment.pressureDrop3h)
+            )
+        } ?: localizedContext.getString(R.string.nowcast_notification_no_pressure)
+
         val now = System.currentTimeMillis()
         val lastSent = repository.getLastNotificationEpochMillis()
         val cooldownMs = cooldownMinutes * 60_000L
@@ -121,9 +136,9 @@ class PressureNowcastWorker(
         createChannelIfMissing()
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher_round)
-            .setContentTitle("Lokalne ostrzeżenie pogodowe")
-            .setContentText(assessment.reason.take(120))
-            .setStyle(NotificationCompat.BigTextStyle().bigText(assessment.reason))
+            .setContentTitle(localizedContext.getString(R.string.nowcast_notification_title))
+            .setContentText(bodyText)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bodyText))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setAutoCancel(true)
             .build()
@@ -148,10 +163,10 @@ class PressureNowcastWorker(
 
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Lokalne ostrzeżenia pogodowe",
+            applicationContext.getString(R.string.nowcast_channel_name),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Ostrzeżenia o gwałtownych zmianach ciśnienia sugerujących burze/fronty."
+            description = applicationContext.getString(R.string.nowcast_channel_description)
         }
         manager.createNotificationChannel(channel)
     }

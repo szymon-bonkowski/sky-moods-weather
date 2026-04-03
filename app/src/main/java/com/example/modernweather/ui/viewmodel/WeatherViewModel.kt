@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.core.os.LocaleListCompat
+import com.example.modernweather.R
 import com.example.modernweather.data.models.Location
 import com.example.modernweather.data.models.AppLanguage
 import com.example.modernweather.data.models.TemperatureUnit
@@ -17,6 +17,7 @@ import com.example.modernweather.data.repository.WeatherRepository
 import com.example.modernweather.nowcast.data.NowcastRepository
 import com.example.modernweather.nowcast.model.NowcastAssessment
 import com.example.modernweather.nowcast.worker.NowcastScheduler
+import com.example.modernweather.utils.localized
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -160,7 +161,13 @@ class WeatherViewModel(application: Application) : ViewModel() {
             _weatherDetailState.value = WeatherDetailUiState.Loading
             weatherRepository.getWeatherData(locationId, languageTag)
                 .catch { e ->
-                    _weatherDetailState.value = WeatherDetailUiState.Error("Nie udało się załadować danych: ${e.message}")
+                    val localizedContext = applicationContext.localized(languageTag)
+                    _weatherDetailState.value = WeatherDetailUiState.Error(
+                        localizedContext.getString(
+                            R.string.weather_detail_load_error_format,
+                            e.message ?: localizedContext.getString(R.string.weather_detail_error_unknown)
+                        )
+                    )
                 }
                 .collect { data ->
                     _weatherDetailState.value = WeatherDetailUiState.Success(data)
@@ -185,12 +192,6 @@ class WeatherViewModel(application: Application) : ViewModel() {
     fun updateAppLanguage(language: AppLanguage) {
         viewModelScope.launch {
             settingsRepository.updateAppLanguage(language)
-            val locales = if (language == AppLanguage.SYSTEM) {
-                LocaleListCompat.getEmptyLocaleList()
-            } else {
-                LocaleListCompat.forLanguageTags(language.languageTag)
-            }
-            androidx.appcompat.app.AppCompatDelegate.setApplicationLocales(locales)
         }
     }
 
