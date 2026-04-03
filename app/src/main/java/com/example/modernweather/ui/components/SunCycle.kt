@@ -22,7 +22,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -44,6 +43,7 @@ import com.example.modernweather.data.models.SunInfo
 import com.example.modernweather.R
 import com.example.modernweather.ui.screens.TitledCard
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
+import androidx.compose.animation.core.LinearEasing
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.LocalTime
@@ -241,21 +241,15 @@ fun SunArc(progress: Float, isDay: Boolean) {
 
     val infiniteTransition = rememberInfiniteTransition(label = "animations")
 
-    var continuousTime by remember { mutableStateOf(0f) }
-    LaunchedEffect(Unit) {
-        val startTime = withFrameNanos { it }
-        var lastUpdateTime = startTime
-        val minFrameInterval = 16_666_666L
-
-        while (true) {
-            withFrameNanos { frameTime ->
-                if (frameTime - lastUpdateTime >= minFrameInterval) {
-                    continuousTime = (frameTime - startTime) / 1_000_000_000f
-                    lastUpdateTime = frameTime
-                }
-            }
-        }
-    }
+    val continuousTime by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 1000_000, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "continuous_time"
+    )
 
     val sunGlowPulse by infiniteTransition.animateFloat(
         initialValue = 0.4f,

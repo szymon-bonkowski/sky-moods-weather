@@ -5,6 +5,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
@@ -21,18 +22,24 @@ fun Modifier.shimmerBackground(shape: androidx.compose.ui.graphics.Shape): Modif
         ), label = "shimmer_translate"
     )
 
-    val shimmerColors = listOf(
-        Color.DarkGray.copy(alpha = 0.6f),
-        Color.Gray.copy(alpha = 0.2f),
-        Color.DarkGray.copy(alpha = 0.6f),
-    )
+    val shimmerColors = remember {
+        listOf(
+            Color.DarkGray.copy(alpha = 0.6f),
+            Color.Gray.copy(alpha = 0.2f),
+            Color.DarkGray.copy(alpha = 0.6f),
+        )
+    }
 
-    this.background(
-        brush = Brush.linearGradient(
+    val brush = remember(translateAnim.value) {
+        Brush.linearGradient(
             colors = shimmerColors,
             start = Offset.Zero,
             end = Offset(x = translateAnim.value, y = translateAnim.value)
-        ),
+        )
+    }
+
+    this.background(
+        brush = brush,
         shape = shape
     )
 }

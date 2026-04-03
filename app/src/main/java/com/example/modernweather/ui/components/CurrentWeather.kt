@@ -69,6 +69,21 @@ fun CurrentWeatherSection(
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
 
+    val tempTextStyle = remember {
+        TextStyle(
+            fontSize = 96.sp,
+            fontWeight = FontWeight.Light,
+            color = Color.White
+        )
+    }
+    val degreeTextStyle = remember {
+        TextStyle(
+            fontSize = 52.sp,
+            fontWeight = FontWeight.Light,
+            color = Color.White.copy(alpha = 0.8f)
+        )
+    }
+
     Box(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.TopCenter
@@ -79,17 +94,6 @@ fun CurrentWeatherSection(
             modifier = Modifier.padding(top = 0.dp, bottom = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            val tempTextStyle = TextStyle(
-                fontSize = 96.sp,
-                fontWeight = FontWeight.Light,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            val degreeTextStyle = TextStyle(
-                fontSize = 52.sp,
-                fontWeight = FontWeight.Light,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
-            )
-
             AnimatedContent(
                 targetState = displayTemp.toString(),
                 transitionSpec = {
@@ -98,10 +102,10 @@ fun CurrentWeatherSection(
                 },
                 label = "temp_anim"
             ) { temp ->
-                val tempLayout = remember(temp, tempTextStyle) {
+                val tempLayout = remember(temp, tempTextStyle, textMeasurer) {
                     textMeasurer.measure(temp, style = tempTextStyle)
                 }
-                val degreeLayout = remember(degreeTextStyle) {
+                val degreeLayout = remember(degreeTextStyle, textMeasurer) {
                     textMeasurer.measure("°", style = degreeTextStyle)
                 }
                 val tempCanvasHeight = remember(tempLayout, degreeLayout, density) {
@@ -188,15 +192,20 @@ private fun HourlySimpleList(
         if (index >= 0) index else 0
     }
 
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentHourIndex)
-    
-    LaunchedEffect(currentHourIndex) {
-        listState.scrollToItem(currentHourIndex)
+    // Pre-calculate display temperatures
+    val displayTemps = remember(hourlyForecast, unit) {
+        hourlyForecast.map { forecast ->
+            if (unit == TemperatureUnit.CELSIUS) forecast.temperature else toFahrenheit(forecast.temperature)
+        }
     }
 
-    LaunchedEffect(listState.isScrollInProgress) {
-        if (!listState.isScrollInProgress && listState.firstVisibleItemIndex < currentHourIndex) {
-            listState.animateScrollToItem(currentHourIndex)
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentHourIndex)
+
+    LaunchedEffect(currentHourIndex, listState.isScrollInProgress) {
+        if (!listState.isScrollInProgress) {
+            if (listState.firstVisibleItemIndex != currentHourIndex) {
+                listState.animateScrollToItem(currentHourIndex)
+            }
         }
     }
 
@@ -303,22 +312,24 @@ private fun HourlySimpleList(
                 key = { index, forecast -> "$index-${forecast.time}" },
                 contentType = { _, _ -> "hourly-item" }
             ) { index, forecast ->
-                val displayTemp = if (unit == TemperatureUnit.CELSIUS) forecast.temperature else toFahrenheit(forecast.temperature)
+                val displayTemp = displayTemps[index]
                 val isNow = index == currentHourIndex
-                
+
+                val backgroundModifier = remember(isNow) {
+                    if (isNow) {
+                        Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .padding(vertical = 4.dp)
+                    } else Modifier
+                }
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
                         .width(itemWidth)
-                        .then(
-                            if (isNow) {
-                                Modifier
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
-                                    .padding(vertical = 4.dp)
-                            } else Modifier
-                        )
+                        .then(backgroundModifier)
                 ) {
                     Text(
                         text = if (isNow) stringResource(R.string.current_weather_now_label) else forecast.time.format(timeFormatter),
