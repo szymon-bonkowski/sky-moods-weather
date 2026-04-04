@@ -65,7 +65,9 @@ fun CurrentWeatherSection(
     pauseEffects: Boolean = false,
     currentTime: java.time.LocalTime = java.time.LocalTime.now()
 ) {
-    val displayTemp = if (unit == TemperatureUnit.CELSIUS) current.temperature else toFahrenheit(current.temperature)
+    val displayTemp = remember(current.temperature, unit) {
+        if (unit == TemperatureUnit.CELSIUS) current.temperature else toFahrenheit(current.temperature)
+    }
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current
 
@@ -149,7 +151,9 @@ fun CurrentWeatherSection(
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            val displayFeelsLike = if (unit == TemperatureUnit.CELSIUS) current.feelsLike else toFahrenheit(current.feelsLike)
+            val displayFeelsLike = remember(current.feelsLike, unit) {
+                if (unit == TemperatureUnit.CELSIUS) current.feelsLike else toFahrenheit(current.feelsLike)
+            }
             Text(
                 text = stringResource(R.string.current_weather_feels_like_format, displayFeelsLike, current.temperatureComparison),
                 style = MaterialTheme.typography.bodyLarge,
@@ -405,8 +409,10 @@ private fun HourlyWaveChart(
     val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
     val pointFillColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
 
-    val iconPainters = hourlyForecast.map { forecast ->
-        painterResource(id = weatherConditionIconRes(forecast.conditionEnum))
+    val iconPainters = remember(hourlyForecast) {
+        hourlyForecast.map { forecast ->
+            painterResource(id = weatherConditionIconRes(forecast.conditionEnum))
+        }
     }
 
     val tempTextLayouts = remember(hourlyForecast, unit, tempTextStyle) {

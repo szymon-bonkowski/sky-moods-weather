@@ -1,6 +1,7 @@
 package com.example.modernweather.ui.viewmodel
 
 import android.app.Application
+import androidx.compose.runtime.Stable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -35,6 +36,7 @@ import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 
+@Stable
 data class LocationsUiState(
     val isLoading: Boolean = true,
     val locations: List<Location> = emptyList(),
@@ -47,6 +49,7 @@ sealed interface WeatherDetailUiState {
     data class Error(val message: String) : WeatherDetailUiState
 }
 
+@Stable
 data class SettingsUiState(
     val temperatureUnit: TemperatureUnit = TemperatureUnit.CELSIUS,
     val isSystemTheme: Boolean = true,

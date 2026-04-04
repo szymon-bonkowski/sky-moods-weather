@@ -1,5 +1,6 @@
 package com.example.modernweather.data.models
 
+import androidx.compose.runtime.Immutable
 import com.example.modernweather.R
 
 enum class TemperatureUnit {
@@ -29,6 +30,7 @@ enum class WeatherDataSource {
     OPEN_METEO
 }
 
+@Immutable
 data class UserSettings(
     val temperatureUnit: TemperatureUnit,
     val isSystemTheme: Boolean,

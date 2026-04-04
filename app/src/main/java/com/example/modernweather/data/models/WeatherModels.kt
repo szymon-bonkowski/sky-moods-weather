@@ -40,12 +40,14 @@ enum class AlertSeverity {
     INFO, WARNING, SEVERE
 }
 
+@Immutable
 data class Location(
     val id: String,
     val name: String,
     val isCurrentLocation: Boolean = false
 )
 
+@Immutable
 data class CurrentWeather(
     val temperature: Int,
     val feelsLike: Int,
@@ -56,6 +58,7 @@ data class CurrentWeather(
     val temperatureComparison: String = ""
 )
 
+@Immutable
 data class HourlyForecast(
     val time: LocalTime,
     val temperature: Int,
@@ -64,6 +67,7 @@ data class HourlyForecast(
     val isCurrent: Boolean = false
 )
 
+@Immutable
 data class DailyForecast(
     val date: LocalDate,
     val highTemp: Int,
@@ -72,6 +76,7 @@ data class DailyForecast(
     val precipitationChance: Int
 )
 
+@Immutable
 data class WeatherAlert(
     val id: String,
     val title: String,
@@ -105,6 +110,7 @@ enum class PollenLevel {
     NONE, LOW, MEDIUM, HIGH, VERY_HIGH
 }
 
+@Immutable
 data class SunInfo(
     val sunrise: LocalTime,
     val sunset: LocalTime

@@ -205,11 +205,13 @@ private fun LocalNowcastCardItem(viewModel: WeatherViewModel) {
 
 @Composable
 fun LocalNowcastCard(assessment: NowcastAssessment) {
-    val (title, color) = when (assessment.riskLevel) {
-        LocalRiskLevel.LOW -> stringResource(R.string.local_nowcast_risk_low) to Color(0xFF4CAF50)
-        LocalRiskLevel.ELEVATED -> stringResource(R.string.local_nowcast_risk_elevated) to Color(0xFFFFB300)
-        LocalRiskLevel.HIGH -> stringResource(R.string.local_nowcast_risk_high) to Color(0xFFFF7043)
-        LocalRiskLevel.SEVERE -> stringResource(R.string.local_nowcast_risk_severe) to Color(0xFFE53935)
+    val (title, color) = remember(assessment.riskLevel) {
+        when (assessment.riskLevel) {
+            LocalRiskLevel.LOW -> stringResource(R.string.local_nowcast_risk_low) to Color(0xFF4CAF50)
+            LocalRiskLevel.ELEVATED -> stringResource(R.string.local_nowcast_risk_elevated) to Color(0xFFFFB300)
+            LocalRiskLevel.HIGH -> stringResource(R.string.local_nowcast_risk_high) to Color(0xFFFF7043)
+            LocalRiskLevel.SEVERE -> stringResource(R.string.local_nowcast_risk_severe) to Color(0xFFE53935)
+        }
     }
 
     TitledCard(stringResource(R.string.weather_detail_phone_barometer)) {
@@ -465,21 +467,25 @@ fun AllergiesSection(details: WeatherDetails) {
 
 @Composable
 fun AllergyItem(label: String, level: PollenLevel, icon: ImageVector, modifier: Modifier = Modifier) {
-    val (levelText, color) = when (level) {
-        PollenLevel.NONE -> stringResource(R.string.pollen_level_none) to AccentGreen
-        PollenLevel.LOW -> stringResource(R.string.pollen_level_low) to AccentGreen
-        PollenLevel.MEDIUM -> stringResource(R.string.pollen_level_medium) to AccentYellow
-        PollenLevel.HIGH -> stringResource(R.string.pollen_level_high) to AccentRed
-        PollenLevel.VERY_HIGH -> stringResource(R.string.pollen_level_very_high) to AccentRed
+    val (levelText, color) = remember(level) {
+        when (level) {
+            PollenLevel.NONE -> stringResource(R.string.pollen_level_none) to AccentGreen
+            PollenLevel.LOW -> stringResource(R.string.pollen_level_low) to AccentGreen
+            PollenLevel.MEDIUM -> stringResource(R.string.pollen_level_medium) to AccentYellow
+            PollenLevel.HIGH -> stringResource(R.string.pollen_level_high) to AccentRed
+            PollenLevel.VERY_HIGH -> stringResource(R.string.pollen_level_very_high) to AccentRed
+        }
     }
 
     val totalSegments = 4
-    val filledSegments = when (level) {
-        PollenLevel.NONE -> 0
-        PollenLevel.LOW -> 1
-        PollenLevel.MEDIUM -> 2
-        PollenLevel.HIGH -> 3
-        PollenLevel.VERY_HIGH -> 4
+    val filledSegments = remember(level) {
+        when (level) {
+            PollenLevel.NONE -> 0
+            PollenLevel.LOW -> 1
+            PollenLevel.MEDIUM -> 2
+            PollenLevel.HIGH -> 3
+            PollenLevel.VERY_HIGH -> 4
+        }
     }
 
     Box(

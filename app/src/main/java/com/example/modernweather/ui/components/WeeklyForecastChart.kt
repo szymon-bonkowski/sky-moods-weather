@@ -107,11 +107,15 @@ fun WeeklyForecastChart(
     val locale = LocalContext.current.resources.configuration.locales[0] ?: Locale.getDefault()
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
 
-    val dayPainters = dailyForecasts.map { forecast ->
-        painterResource(id = weatherConditionIconRes(forecast.conditionEnum, true))
+    val dayPainters = remember(dailyForecasts) {
+        dailyForecasts.map { forecast ->
+            painterResource(id = weatherConditionIconRes(forecast.conditionEnum, true))
+        }
     }
-    val nightPainters = dailyForecasts.map { forecast ->
-        painterResource(id = weatherConditionIconRes(forecast.conditionEnum, false))
+    val nightPainters = remember(dailyForecasts) {
+        dailyForecasts.map { forecast ->
+            painterResource(id = weatherConditionIconRes(forecast.conditionEnum, false))
+        }
     }
     val forecastKey = remember(dailyForecasts) {
         dailyForecasts.joinToString("|") { forecast ->

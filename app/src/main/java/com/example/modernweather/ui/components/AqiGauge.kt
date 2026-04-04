@@ -66,9 +66,15 @@ fun AqiGauge(
         label = "aqi_number"
     )
 
-    val currentAnimatedAqiValue = (sweepAngle / 240f) * maxAqi
-    val gaugeColor = getAqiColor(aqiValue = currentAnimatedAqiValue)
-    val finalGaugeColor = getAqiColor(aqiValue = aqi.toFloat())
+    val currentAnimatedAqiValue = remember(sweepAngle) {
+        (sweepAngle / 240f) * maxAqi
+    }
+    val gaugeColor = remember(sweepAngle, currentAnimatedAqiValue) {
+        getAqiColor(aqiValue = currentAnimatedAqiValue)
+    }
+    val finalGaugeColor = remember(aqi) {
+        getAqiColor(aqiValue = aqi.toFloat())
+    }
 
     val aqiText = when {
         aqi <= 50 -> stringResource(R.string.aqi_good)
