@@ -20,10 +20,10 @@
     <string name="settings_nowcast_ml_model_label">Model ML (TensorFlow Lite)</string>
     <string name="language_system_default">Domyślny systemowy</string>
     <string name="language_polish">Polski</string>
-    <string name="language_english">Angielski</string>
-    <string name="language_turkish">Turecki</string>
-    <string name="language_spanish">Hiszpański</string>
-    <string name="language_italian">Włoski</string>
+    <string name="language_english">English</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_italian">Italiano</string>
     <string name="locations_title">Moje lokalizacje</string>
     <string name="locations_settings_content_description">Ustawienia</string>
     <string name="locations_error_prefix">Błąd: %1$s</string>
@@ -31,6 +31,9 @@
     <string name="locations_search_hint">Wyszukaj miejsce lub kod pocztowy</string>
     <string name="locations_search_content_description">Szukaj</string>
     <string name="locations_location_content_description">Lokalizacja</string>
+    <string name="location_name_warszawa">Warszawa</string>
+    <string name="location_name_krakow">Kraków</string>
+    <string name="location_name_gdansk">Gdańsk</string>
     <string name="radar_title">Radar pogodowy</string>
     <string name="radar_placeholder">Miejsce zastępcze</string>
     <string name="sun_cycle_title">Wschód i zachód słońca</string>

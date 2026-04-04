@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="language_system_default">Predeterminado del sistema</string>
-    <string name="language_polish">Polaco</string>
-    <string name="language_english">Inglés</string>
-    <string name="language_turkish">Turco</string>
+    <string name="language_polish">Polski</string>
+    <string name="language_english">English</string>
+    <string name="language_turkish">Türkçe</string>
     <string name="language_spanish">Español</string>
     <string name="language_italian">Italiano</string>
     <string name="settings_title">Ajustes</string>
@@ -28,6 +28,9 @@
     <string name="locations_search_hint">Buscar un lugar o código postal</string>
     <string name="locations_search_content_description">Buscar</string>
     <string name="locations_location_content_description">Ubicación</string>
+    <string name="location_name_warszawa">Varsovia</string>
+    <string name="location_name_krakow">Cracovia</string>
+    <string name="location_name_gdansk">Gdansk</string>
     <string name="weather_detail_load_error_format">No se pudieron cargar los datos meteorológicos: %1$s</string>
     <string name="weather_detail_error_unknown">Error desconocido</string>
     <string name="nowcast_notification_title">Alerta meteorológica local</string>

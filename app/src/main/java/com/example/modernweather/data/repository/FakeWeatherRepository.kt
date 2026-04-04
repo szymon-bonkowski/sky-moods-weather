@@ -3,6 +3,7 @@ package com.example.modernweather.data.repository
 import android.content.Context
 import com.example.modernweather.R
 import com.example.modernweather.data.models.*
+import com.example.modernweather.utils.locationNameForId
 import com.example.modernweather.utils.WeatherTextFormatter
 import com.example.modernweather.utils.localized
 import kotlinx.coroutines.delay
@@ -44,30 +45,33 @@ class FakeWeatherRepository(
     }
 
     private val fakeLocations = listOf(
-        Location(id = "warszawa", name = "Warszawa", isCurrentLocation = true),
-        Location(id = "krakow", name = "Kraków"),
-        Location(id = "gdansk", name = "Gdańsk")
+        Location(id = "warszawa", name = "Warsaw", isCurrentLocation = true),
+        Location(id = "krakow", name = "Krakow"),
+        Location(id = "gdansk", name = "Gdansk")
     )
 
     override fun getSavedLocations(languageTag: String?): Flow<List<Location>> = flow {
         delay(300)
-        emit(fakeLocations)
+        val localizedContext = context.localized(languageTag)
+        emit(
+            fakeLocations.map { location -> localizeLocation(location, localizedContext) }
+        )
     }
 
     override fun getWeatherData(locationId: String, languageTag: String?): Flow<WeatherData> = flow {
         val localizedContext = context.localized(languageTag)
         delay(1500)
-        val location = fakeLocations.first { it.id == locationId }
+        val location = localizeLocation(
+            location = fakeLocations.first { it.id == locationId },
+            localizedContext = localizedContext
+        )
 
-        // Emit initial data
         emit(generateFakeDataFor(location, localizedContext))
 
-        // Cache the flow for this location
         val cacheFlow = weatherDataCache.getOrPut(locationId) {
             MutableStateFlow<WeatherData?>(null)
         }
 
-        // Collect from cache for subsequent updates (if any)
         cacheFlow.collect { cached ->
             if (cached != null) {
                 emit(cached)
@@ -166,6 +170,12 @@ class FakeWeatherRepository(
                 sunrise = testSunrise ?: LocalTime.of(4, 20),
                 sunset = testSunset ?: LocalTime.of(20, 47)
             )
+        )
+    }
+
+    private fun localizeLocation(location: Location, localizedContext: Context): Location {
+        return location.copy(
+            name = localizedContext.locationNameForId(location.id, location.name)
         )
     }
 }

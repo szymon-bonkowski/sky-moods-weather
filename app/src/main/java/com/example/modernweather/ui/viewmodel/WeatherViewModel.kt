@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 
@@ -71,24 +72,22 @@ class WeatherViewModel(application: Application) : ViewModel() {
     private var weatherRepository: WeatherRepository = fakeWeatherRepository
     private val applicationContext = application.applicationContext
     private var weatherDetailJob: Job? = null
+    private var locationsJob: Job? = null
     private var weatherDetailLocationId: String? = null
+    private var currentLanguageTag: String? = null
+    private var currentWeatherSource: WeatherDataSource = WeatherDataSource.FAKE
 
-    private val weatherSourceJob = settingsRepository.userSettingsFlow
-        .map { it.weatherDataSource }
-        .distinctUntilChanged()
-        .onEach { source ->
-            selectWeatherRepository(source)
-            if (weatherDetailLocationId != null) {
-                reloadWeatherDetail()
-            }
-            loadSavedLocations()
+    private val userSettingsSyncJob = settingsRepository.userSettingsFlow
+        .map { settings ->
+            settings.weatherDataSource to settings.appLanguage.languageTag.takeIf { it.isNotBlank() }
         }
-        .launchIn(viewModelScope)
-
-    private val languageJob = settingsRepository.userSettingsFlow
-        .map { it.appLanguage }
         .distinctUntilChanged()
-        .onEach {
+        .onEach { (source, languageTag) ->
+            currentLanguageTag = languageTag
+            if (source != currentWeatherSource) {
+                currentWeatherSource = source
+                selectWeatherRepository(source)
+            }
             if (weatherDetailLocationId != null) {
                 reloadWeatherDetail()
             }
@@ -157,7 +156,7 @@ class WeatherViewModel(application: Application) : ViewModel() {
         weatherDetailLocationId = locationId
 
         weatherDetailJob = viewModelScope.launch {
-            val languageTag = currentLanguageTag()
+            val languageTag = resolveCurrentLanguageTag()
             _weatherDetailState.value = WeatherDetailUiState.Loading
             weatherRepository.getWeatherData(locationId, languageTag)
                 .catch { e ->
@@ -223,11 +222,13 @@ class WeatherViewModel(application: Application) : ViewModel() {
         }
     }
 
-    fun loadSavedLocations() {
-        viewModelScope.launch {
-            val languageTag = currentLanguageTag()
+    private fun loadSavedLocations() {
+        locationsJob?.cancel()
+        locationsJob = viewModelScope.launch {
+            val languageTag = resolveCurrentLanguageTag()
             _locationsState.value = LocationsUiState(isLoading = true)
             weatherRepository.getSavedLocations(languageTag)
+                .take(1)
                 .catch { e ->
                     _locationsState.value = LocationsUiState(isLoading = false, error = e.message)
                 }
@@ -264,7 +265,11 @@ class WeatherViewModel(application: Application) : ViewModel() {
         loadWeatherData(locationId)
     }
 
-    private fun currentLanguageTag(): String? {
-        return settingsState.value.appLanguage.languageTag.takeIf { it.isNotBlank() }
+    private suspend fun resolveCurrentLanguageTag(): String? {
+        return currentLanguageTag ?: settingsRepository.userSettingsFlow
+            .first()
+            .appLanguage
+            .languageTag
+            .takeIf { it.isNotBlank() }
     }
 }

@@ -19,11 +19,11 @@
     <string name="settings_nowcast_notifications_label">Hazard notifications</string>
     <string name="settings_nowcast_ml_model_label">ML model (TensorFlow Lite)</string>
     <string name="language_system_default">System default</string>
-    <string name="language_polish">Polish</string>
+    <string name="language_polish">Polski</string>
     <string name="language_english">English</string>
-    <string name="language_turkish">Turkish</string>
-    <string name="language_spanish">Spanish</string>
-    <string name="language_italian">Italian</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_spanish">Español</string>
+    <string name="language_italian">Italiano</string>
     <string name="locations_title">My locations</string>
     <string name="locations_settings_content_description">Settings</string>
     <string name="locations_error_prefix">Error: %1$s</string>
@@ -31,6 +31,9 @@
     <string name="locations_search_hint">Search for a place or postal code</string>
     <string name="locations_search_content_description">Search</string>
     <string name="locations_location_content_description">Location</string>
+    <string name="location_name_warszawa">Warsaw</string>
+    <string name="location_name_krakow">Krakow</string>
+    <string name="location_name_gdansk">Gdansk</string>
     <string name="radar_title">Weather radar</string>
     <string name="radar_placeholder">Placeholder</string>
     <string name="sun_cycle_title">Sunrise and sunset</string>

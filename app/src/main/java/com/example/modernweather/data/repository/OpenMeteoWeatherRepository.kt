@@ -14,6 +14,7 @@ import com.example.modernweather.data.models.WeatherCondition
 import com.example.modernweather.data.models.WeatherData
 import com.example.modernweather.data.models.WeatherDetails
 import com.example.modernweather.utils.WeatherTextFormatter
+import com.example.modernweather.utils.locationNameForId
 import com.example.modernweather.utils.localized
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -86,7 +87,7 @@ class OpenMeteoWeatherRepository(
         val geocoded = geocodeLocation(spec, languageTag)
         val location = Location(
             id = spec.id,
-            name = geocoded.name,
+            name = context.localized(languageTag).locationNameForId(spec.id, geocoded.name),
             isCurrentLocation = spec.isCurrentLocation
         )
         locationCache[cacheKey] = location
@@ -105,7 +106,7 @@ class OpenMeteoWeatherRepository(
         }
         locationCache[cacheKey] = Location(
             id = spec.id,
-            name = geocoded.name,
+            name = localizedContext.locationNameForId(spec.id, geocoded.name),
             isCurrentLocation = spec.isCurrentLocation
         )
 
@@ -210,7 +211,7 @@ class OpenMeteoWeatherRepository(
         return WeatherData(
             location = locationCache[cacheKey] ?: Location(
                 id = spec.id,
-                name = geocoded.name,
+                name = localizedContext.locationNameForId(spec.id, geocoded.name),
                 isCurrentLocation = spec.isCurrentLocation
             ),
             currentWeather = CurrentWeather(

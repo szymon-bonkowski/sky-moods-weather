@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="language_system_default">Predefinito di sistema</string>
-    <string name="language_polish">Polacco</string>
-    <string name="language_english">Inglese</string>
-    <string name="language_turkish">Turco</string>
-    <string name="language_spanish">Spagnolo</string>
+    <string name="language_polish">Polski</string>
+    <string name="language_english">English</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_spanish">Español</string>
     <string name="language_italian">Italiano</string>
     <string name="settings_title">Impostazioni</string>
     <string name="settings_section_units">Unità</string>
@@ -28,6 +28,9 @@
     <string name="locations_search_hint">Cerca un luogo o CAP</string>
     <string name="locations_search_content_description">Cerca</string>
     <string name="locations_location_content_description">Località</string>
+    <string name="location_name_warszawa">Varsavia</string>
+    <string name="location_name_krakow">Cracovia</string>
+    <string name="location_name_gdansk">Danzica</string>
     <string name="weather_detail_load_error_format">Impossibile caricare i dati meteo: %1$s</string>
     <string name="weather_detail_error_unknown">Errore sconosciuto</string>
     <string name="nowcast_notification_title">Avviso meteo locale</string>
