@@ -122,17 +122,6 @@ fun WeatherPage(
 
     val stableSunInfo = remember(data.location.id) { data.sunInfo }
     val listState = rememberLazyListState()
-    val isCurrentWeatherVisible by remember {
-        derivedStateOf {
-            listState.layoutInfo.visibleItemsInfo.any { it.key == "current_weather" }
-        }
-    }
-    val isListScrolling by remember {
-        derivedStateOf { listState.isScrollInProgress }
-    }
-    val shouldRunHeavyEffects by remember {
-        derivedStateOf { isCurrentWeatherVisible && !isListScrolling }
-    }
 
     val stableHourlyForecast = remember(data.hourlyForecast) { data.hourlyForecast }
     val stableDailyForecast = remember(data.dailyForecast) { data.dailyForecast }
@@ -149,7 +138,6 @@ fun WeatherPage(
                 current = stableCurrentWeather,
                 hourly = stableHourlyForecast,
                 unit = unit,
-                pauseEffects = !shouldRunHeavyEffects,
                 currentTime = currentTime
             )
         }
