@@ -51,11 +51,8 @@ import com.example.modernweather.R
 import com.example.modernweather.ui.screens.toFahrenheit
 import com.example.modernweather.ui.theme.AccentBlue
 import com.example.modernweather.ui.components.weatherConditionIconRes
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import java.time.format.DateTimeFormatter
 import kotlin.math.max
-import kotlin.random.Random
 
 @Composable
 fun CurrentWeatherSection(
@@ -88,8 +85,6 @@ fun CurrentWeatherSection(
         modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.TopCenter
     ) {
-        WeatherParticleSystem(condition = current.conditionEnum, enabled = !pauseEffects)
-
         Column(
             modifier = Modifier.padding(top = 0.dp, bottom = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -622,86 +617,5 @@ private fun HourlyWaveChart(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun WeatherParticleSystem(condition: WeatherCondition, enabled: Boolean = true) {
-    val particles = remember { mutableStateListOf<Particle>() }
-    val particlePool = remember { mutableListOf<Particle>() }
-    val isRainOrSnow = remember(condition) {
-        condition in listOf(
-            WeatherCondition.DAY_RAIN_LIGHT, WeatherCondition.DAY_RAIN_MEDIUM, WeatherCondition.DAY_RAIN_HEAVY,
-            WeatherCondition.NIGHT_RAIN_LIGHT, WeatherCondition.NIGHT_RAIN_MEDIUM,
-            WeatherCondition.DAY_SNOW, WeatherCondition.NIGHT_SNOW
-        )
-    }
-
-    LaunchedEffect(enabled) {
-        if (!enabled) {
-            particles.clear()
-        }
-    }
-
-    if (isRainOrSnow && enabled) {
-        LaunchedEffect(condition) {
-            val isSnow = condition == WeatherCondition.DAY_SNOW || condition == WeatherCondition.NIGHT_SNOW
-            while (isActive) {
-                val particle = if (particlePool.isNotEmpty()) {
-                    particlePool.removeAt(particlePool.size - 1).apply { reset(isSnow) }
-                } else {
-                    Particle(isSnow = isSnow)
-                }
-                particles.add(particle)
-                if (particles.size > 100) {
-                    val removed = particles.removeAt(0)
-                    particlePool.add(removed)
-                }
-                delay(100)
-            }
-        }
-
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val canvasHeight = size.height
-            val canvasWidth = size.width
-
-            particles.forEach { particle ->
-                particle.update(canvasHeight)
-                drawCircle(
-                    color = particle.color,
-                    radius = particle.radius,
-                    center = Offset(particle.x * canvasWidth, particle.y)
-                )
-            }
-        }
-    }
-}
-
-private class Particle(
-    var isSnow: Boolean,
-    var x: Float = Random.nextFloat(),
-    var y: Float = 0f,
-    var radius: Float = if (isSnow) Random.nextFloat() * 2f + 2f else Random.nextFloat() * 1f + 1f,
-    var color: Color = (if (isSnow) Color.White else AccentBlue).copy(alpha = Random.nextFloat() * 0.5f + 0.5f),
-    private var ySpeed: Float = if (isSnow) Random.nextFloat() * 1.5f + 1f else Random.nextFloat() * 4f + 4f,
-    private var xDrift: Float = if (isSnow) Random.nextFloat() - 0.5f else 0f
-) {
-    fun update(canvasHeight: Float) {
-        y += ySpeed
-        x += xDrift * 0.01f
-        if (y > canvasHeight) {
-            y = 0f
-            x = Random.nextFloat()
-        }
-    }
-
-    fun reset(snow: Boolean) {
-        isSnow = snow
-        x = Random.nextFloat()
-        y = 0f
-        radius = if (isSnow) Random.nextFloat() * 2f + 2f else Random.nextFloat() * 1f + 1f
-        color = (if (isSnow) Color.White else AccentBlue).copy(alpha = Random.nextFloat() * 0.5f + 0.5f)
-        ySpeed = if (isSnow) Random.nextFloat() * 1.5f + 1f else Random.nextFloat() * 4f + 4f
-        xDrift = if (isSnow) Random.nextFloat() - 0.5f else 0f
     }
 }
