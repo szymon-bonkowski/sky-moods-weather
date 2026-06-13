@@ -11,8 +11,8 @@
     <string name="settings_temperature_label">Temperatura</string>
     <string name="settings_system_theme_label">Motyw systemowy</string>
     <string name="settings_dark_theme_label">Tryb ciemny</string>
-    <string name="settings_use_open_meteo">Używaj Open-Meteo</string>
-    <string name="settings_open_meteo_description">Prawdziwe dane o pogodzie i jakości powietrza.</string>
+    <string name="settings_use_google_weather">Używaj Google Weather</string>
+    <string name="settings_google_weather_description">Prawdziwe dane pogodowe z Google Weather API.</string>
     <string name="settings_fake_data_description">Fałszywe dane do ręcznych zmian i testów.</string>
     <string name="settings_enable_local_nowcast">Włącz lokalne wykrywanie frontu</string>
     <string name="settings_no_barometer_warning">Twoje urządzenie nie ma barometru, który jest wymagany dla tej funkcji.</string>
@@ -91,7 +91,7 @@
     <string name="weather_alert_intense_rain_description">Prognoza wskazuje na intensywny deszcz lub burze w najbliższych godzinach.</string>
     <string name="weather_alert_rapid_change_description">W najbliższych godzinach możliwe są szybkie zmiany pogody.</string>
     <string name="weather_alert_wind_title">Silny wiatr</string>
-    <string name="weather_alert_wind_description">Open-Meteo wskazuje silniejsze porywy wiatru.</string>
+    <string name="weather_alert_wind_description">Google Weather wskazuje silniejsze porywy wiatru.</string>
     <string name="weather_alert_uv_title">Wysoki indeks UV</string>
     <string name="weather_alert_uv_description">Dzisiejszy indeks UV sugeruje ograniczenie ekspozycji na słońce.</string>
     <string name="weather_alert_storm_title">Burza w pobliżu</string>

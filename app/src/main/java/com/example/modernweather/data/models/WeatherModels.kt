@@ -98,7 +98,9 @@ data class WeatherDetails(
     val precipitation: Float,
     val grassPollen: PollenLevel = PollenLevel.NONE,
     val treePollen: PollenLevel = PollenLevel.NONE,
-    val ragweedPollen: PollenLevel = PollenLevel.NONE
+    val ragweedPollen: PollenLevel = PollenLevel.NONE,
+    val airQualityAvailable: Boolean = true,
+    val pollenAvailable: Boolean = true
 )
 
 enum class PollenLevel {

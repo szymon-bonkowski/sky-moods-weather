@@ -1,8 +1,32 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     kotlin("kapt")
     alias(libs.plugins.kotlin.compose)
+}
+
+val envProperties = Properties().apply {
+    val envFile = rootProject.file(".env")
+    if (envFile.exists()) {
+        envFile.inputStream().use { load(it) }
+    }
+}
+
+fun envValue(vararg names: String): String {
+    return names.firstNotNullOfOrNull { name ->
+        val value = envProperties.getProperty(name) ?: System.getenv(name)
+        value
+            ?.trim()
+            ?.removeSurrounding("\"")
+            ?.removeSurrounding("'")
+            ?.takeIf { it.isNotBlank() }
+    }.orEmpty()
+}
+
+fun String.asBuildConfigString(): String {
+    return "\"${replace("\\", "\\\\").replace("\"", "\\\"")}\""
 }
 
 android {
@@ -17,6 +41,11 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField(
+            "String",
+            "GOOGLE_MAPS_API_KEY",
+            envValue("GOOGLE_MAPS_API_KEY", "GOOGLE_WEATHER_API_KEY").asBuildConfigString()
+        )
     }
 
     buildTypes {
@@ -34,6 +63,9 @@ android {
     }
     androidResources {
         generateLocaleConfig = true
+    }
+    buildFeatures {
+        buildConfig = true
     }
     kotlinOptions {
         jvmTarget = "17"

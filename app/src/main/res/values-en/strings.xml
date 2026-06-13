@@ -11,8 +11,8 @@
     <string name="settings_temperature_label">Temperature</string>
     <string name="settings_system_theme_label">System theme</string>
     <string name="settings_dark_theme_label">Dark mode</string>
-    <string name="settings_use_open_meteo">Use Open-Meteo</string>
-    <string name="settings_open_meteo_description">Real weather and air quality data.</string>
+    <string name="settings_use_google_weather">Use Google Weather</string>
+    <string name="settings_google_weather_description">Real weather data from Google Weather API.</string>
     <string name="settings_fake_data_description">Fake data for manual changes and testing.</string>
     <string name="settings_enable_local_nowcast">Enable local front detection</string>
     <string name="settings_no_barometer_warning">Your device does not have a barometer, which is required for this feature.</string>
@@ -77,7 +77,7 @@
     <string name="weather_alert_intense_rain_description">Forecast shows intense rain or thunderstorms in the coming hours.</string>
     <string name="weather_alert_rapid_change_description">Rapid weather changes are possible in the coming hours.</string>
     <string name="weather_alert_wind_title">Strong wind</string>
-    <string name="weather_alert_wind_description">Open-Meteo indicates stronger wind gusts.</string>
+    <string name="weather_alert_wind_description">Google Weather indicates stronger wind gusts.</string>
     <string name="weather_alert_uv_title">High UV index</string>
     <string name="weather_alert_uv_description">Today’s UV index suggests limiting sun exposure.</string>
     <string name="weather_alert_storm_title">Storm nearby</string>

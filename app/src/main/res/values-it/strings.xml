@@ -14,8 +14,8 @@
     <string name="settings_temperature_label">Temperatura</string>
     <string name="settings_system_theme_label">Tema di sistema</string>
     <string name="settings_dark_theme_label">Modalità scura</string>
-    <string name="settings_use_open_meteo">Usa Open-Meteo</string>
-    <string name="settings_open_meteo_description">Dati reali su meteo e qualità dell’aria.</string>
+    <string name="settings_use_google_weather">Usa Google Weather</string>
+    <string name="settings_google_weather_description">Dati meteo reali da Google Weather API.</string>
     <string name="settings_fake_data_description">Dati falsi per modifiche manuali e test.</string>
     <string name="settings_enable_local_nowcast">Attiva rilevamento locale dei fronti</string>
     <string name="settings_no_barometer_warning">Il tuo dispositivo non ha un barometro, necessario per questa funzione.</string>

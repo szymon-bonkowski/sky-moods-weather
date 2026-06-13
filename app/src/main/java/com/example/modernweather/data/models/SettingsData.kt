@@ -26,7 +26,7 @@ enum class AppLanguage(
 
 enum class WeatherDataSource {
     FAKE,
-    OPEN_METEO
+    GOOGLE_WEATHER
 }
 
 data class UserSettings(

@@ -11,7 +11,7 @@ import com.example.modernweather.data.models.TemperatureUnit
 import com.example.modernweather.data.models.WeatherData
 import com.example.modernweather.data.models.WeatherDataSource
 import com.example.modernweather.data.repository.FakeWeatherRepository
-import com.example.modernweather.data.repository.OpenMeteoWeatherRepository
+import com.example.modernweather.data.repository.GoogleWeatherRepository
 import com.example.modernweather.data.repository.SettingsRepository
 import com.example.modernweather.data.repository.WeatherRepository
 import com.example.modernweather.nowcast.data.NowcastRepository
@@ -67,7 +67,7 @@ class WeatherViewModel(application: Application) : ViewModel() {
     private val settingsRepository = SettingsRepository(application)
     private val nowcastRepository = NowcastRepository(application)
     private val fakeWeatherRepository = FakeWeatherRepository(application)
-    private val openMeteoWeatherRepository = OpenMeteoWeatherRepository(application)
+    private val googleWeatherRepository = GoogleWeatherRepository(application)
 
     private var weatherRepository: WeatherRepository = fakeWeatherRepository
     private val applicationContext = application.applicationContext
@@ -253,7 +253,7 @@ class WeatherViewModel(application: Application) : ViewModel() {
     private fun selectWeatherRepository(source: WeatherDataSource) {
         weatherRepository = when (source) {
             WeatherDataSource.FAKE -> fakeWeatherRepository
-            WeatherDataSource.OPEN_METEO -> openMeteoWeatherRepository
+            WeatherDataSource.GOOGLE_WEATHER -> googleWeatherRepository
         }
     }
 

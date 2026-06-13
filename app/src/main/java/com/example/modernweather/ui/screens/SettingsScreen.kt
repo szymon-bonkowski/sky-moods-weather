@@ -181,17 +181,17 @@ fun WeatherSourceSelector(
     onSourceSelected: (WeatherDataSource) -> Unit
 ) {
     Column {
-        SettingItem(label = stringResource(R.string.settings_use_open_meteo)) {
+        SettingItem(label = stringResource(R.string.settings_use_google_weather)) {
             Switch(
-                checked = selectedSource == WeatherDataSource.OPEN_METEO,
+                checked = selectedSource == WeatherDataSource.GOOGLE_WEATHER,
                 onCheckedChange = { checked ->
-                    onSourceSelected(if (checked) WeatherDataSource.OPEN_METEO else WeatherDataSource.FAKE)
+                    onSourceSelected(if (checked) WeatherDataSource.GOOGLE_WEATHER else WeatherDataSource.FAKE)
                 }
             )
         }
         Text(
-            text = if (selectedSource == WeatherDataSource.OPEN_METEO) {
-                stringResource(R.string.settings_open_meteo_description)
+            text = if (selectedSource == WeatherDataSource.GOOGLE_WEATHER) {
+                stringResource(R.string.settings_google_weather_description)
             } else {
                 stringResource(R.string.settings_fake_data_description)
             },

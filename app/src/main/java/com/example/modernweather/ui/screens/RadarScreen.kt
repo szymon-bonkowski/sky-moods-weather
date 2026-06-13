@@ -23,7 +23,7 @@ import com.example.modernweather.R
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RadarScreen(onNavigateBack: () -> Unit) {
-    // TODO: wire a real radar source if Open-Meteo or another provider is added later.
+    // TODO: wire a real radar source if Google Weather maps or another provider is added later.
     Scaffold(
         topBar = {
             TopAppBar(

@@ -11,8 +11,8 @@
     <string name="settings_temperature_label">Sıcaklık</string>
     <string name="settings_system_theme_label">Sistem teması</string>
     <string name="settings_dark_theme_label">Karanlık mod</string>
-    <string name="settings_use_open_meteo">Open-Meteo kullan</string>
-    <string name="settings_open_meteo_description">Gerçek hava durumu ve hava kalitesi verileri.</string>
+    <string name="settings_use_google_weather">Google Weather kullan</string>
+    <string name="settings_google_weather_description">Google Weather API’den gerçek hava durumu verileri.</string>
     <string name="settings_fake_data_description">Elle değişiklikler ve test için sahte veriler.</string>
     <string name="settings_enable_local_nowcast">Yerel cephe algılamayı etkinleştir</string>
     <string name="settings_no_barometer_warning">Cihazınızda bu özellik için gerekli olan bir barometre yok.</string>
@@ -91,7 +91,7 @@
     <string name="weather_alert_intense_rain_description">Tahmin, önümüzdeki saatlerde yoğun yağmur veya fırtına gösteriyor.</string>
     <string name="weather_alert_rapid_change_description">Önümüzdeki saatlerde hava hızlı değişebilir.</string>
     <string name="weather_alert_wind_title">Kuvvetli rüzgar</string>
-    <string name="weather_alert_wind_description">Open-Meteo daha güçlü rüzgar hamleleri gösteriyor.</string>
+    <string name="weather_alert_wind_description">Google Weather daha güçlü rüzgar hamleleri gösteriyor.</string>
     <string name="weather_alert_uv_title">Yüksek UV indeksi</string>
     <string name="weather_alert_uv_description">Bugünkü UV indeksi, güneşe maruziyeti sınırlamayı öneriyor.</string>
     <string name="weather_alert_storm_title">Yakında fırtına</string>

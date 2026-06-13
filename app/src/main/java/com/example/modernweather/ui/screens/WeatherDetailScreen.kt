@@ -164,8 +164,12 @@ fun WeatherPage(
         item(key = "details_aqi", contentType = "details") {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 DetailsGrid(details = stableDetails)
-                AqiSection(details = stableDetails)
-                AllergiesSection(details = stableDetails)
+                if (stableDetails.airQualityAvailable) {
+                    AqiSection(details = stableDetails)
+                }
+                if (stableDetails.pollenAvailable) {
+                    AllergiesSection(details = stableDetails)
+                }
             }
         }
 
