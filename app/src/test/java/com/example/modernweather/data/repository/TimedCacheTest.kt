@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Test
 import java.time.Clock
 import java.time.Duration
@@ -40,13 +41,86 @@ class TimedCacheTest {
     @Test
     fun staleEntryIsUsedWhenReloadFails() = runBlocking {
         cache.put("warszawa:en:current", "old")
-        clock.current = now.plus(ttl).plusSeconds(1)
+        val failureAt = now.plus(ttl).plusSeconds(1)
+        clock.current = failureAt
 
         val result = cache.getOrLoad("warszawa:en:current", ttl) {
             error("temporary network failure")
         }
 
         assertEquals("old", result)
+        assertFalse(cache.isFresh("warszawa:en:current", ttl))
+        assertEquals(
+            failureAt.plus(Duration.ofMinutes(1)),
+            cache.nextRefreshInstant("warszawa:en:current", ttl)
+        )
+    }
+
+    @Test
+    fun staleEntryInsideBackoffReturnsWithoutReloading() = runBlocking {
+        cache.put("warszawa:en:current", "old")
+        clock.current = now.plus(ttl).plusSeconds(1)
+        cache.getOrLoad("warszawa:en:current", ttl) {
+            error("temporary network failure")
+        }
+
+        var loaderCalls = 0
+        clock.current = clock.current.plusSeconds(30)
+        val result = cache.getOrLoad("warszawa:en:current", ttl) {
+            loaderCalls++
+            "new"
+        }
+
+        assertEquals("old", result)
+        assertEquals(0, loaderCalls)
+    }
+
+    @Test
+    fun repeatedFailuresUseExponentialBackoffCappedAtFifteenMinutes() = runBlocking {
+        cache.put("warszawa:en:current", "old")
+        clock.current = now.plus(ttl).plusSeconds(1)
+
+        cache.getOrLoad("warszawa:en:current", ttl) { error("failure 1") }
+        assertEquals(clock.current.plus(Duration.ofMinutes(1)), cache.nextRefreshInstant("warszawa:en:current", ttl))
+
+        clock.current = cache.nextRefreshInstant("warszawa:en:current", ttl)!!.plusMillis(1)
+        cache.getOrLoad("warszawa:en:current", ttl) { error("failure 2") }
+        assertEquals(clock.current.plus(Duration.ofMinutes(2)), cache.nextRefreshInstant("warszawa:en:current", ttl))
+
+        clock.current = cache.nextRefreshInstant("warszawa:en:current", ttl)!!.plusMillis(1)
+        cache.getOrLoad("warszawa:en:current", ttl) { error("failure 3") }
+        assertEquals(clock.current.plus(Duration.ofMinutes(4)), cache.nextRefreshInstant("warszawa:en:current", ttl))
+
+        clock.current = cache.nextRefreshInstant("warszawa:en:current", ttl)!!.plusMillis(1)
+        cache.getOrLoad("warszawa:en:current", ttl) { error("failure 4") }
+        assertEquals(clock.current.plus(Duration.ofMinutes(8)), cache.nextRefreshInstant("warszawa:en:current", ttl))
+
+        clock.current = cache.nextRefreshInstant("warszawa:en:current", ttl)!!.plusMillis(1)
+        cache.getOrLoad("warszawa:en:current", ttl) { error("failure 5") }
+        assertEquals(clock.current.plus(Duration.ofMinutes(15)), cache.nextRefreshInstant("warszawa:en:current", ttl))
+
+        clock.current = cache.nextRefreshInstant("warszawa:en:current", ttl)!!.plusMillis(1)
+        cache.getOrLoad("warszawa:en:current", ttl) { error("failure 6") }
+        assertEquals(clock.current.plus(Duration.ofMinutes(15)), cache.nextRefreshInstant("warszawa:en:current", ttl))
+    }
+
+    @Test
+    fun successfulReloadResetsRetryState() = runBlocking {
+        cache.put("warszawa:en:current", "old")
+        clock.current = now.plus(ttl).plusSeconds(1)
+        cache.getOrLoad("warszawa:en:current", ttl) {
+            error("temporary network failure")
+        }
+
+        clock.current = cache.nextRefreshInstant("warszawa:en:current", ttl)!!.plusMillis(1)
+        val reloadedAt = clock.current
+        val result = cache.getOrLoad("warszawa:en:current", ttl) {
+            "new"
+        }
+
+        assertEquals("new", result)
+        assertTrue(cache.isFresh("warszawa:en:current", ttl))
+        assertEquals(reloadedAt.plus(ttl), cache.nextRefreshInstant("warszawa:en:current", ttl))
     }
 
     @Test
@@ -59,13 +133,18 @@ class TimedCacheTest {
         assertNull(cache.getFresh("krakow:en:current", ttl))
     }
 
-    @Test(expected = CancellationException::class)
+    @Test
     fun cancellationIsNotConvertedToStaleFallback() = runBlocking<Unit> {
         cache.put("warszawa:en:current", "old")
         clock.current = now.plus(ttl).plusSeconds(1)
 
-        cache.getOrLoad("warszawa:en:current", ttl) {
-            throw CancellationException("cancelled")
+        try {
+            cache.getOrLoad("warszawa:en:current", ttl) {
+                throw CancellationException("cancelled")
+            }
+            fail("Expected cancellation to be rethrown")
+        } catch (_: CancellationException) {
+            assertEquals(now.plus(ttl), cache.nextRefreshInstant("warszawa:en:current", ttl))
         }
     }
 
