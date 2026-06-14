@@ -18,6 +18,7 @@ import com.example.modernweather.nowcast.model.NowcastAssessment
 import com.example.modernweather.nowcast.worker.NowcastScheduler
 import com.example.modernweather.utils.localized
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,6 +33,8 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.Instant
 import java.time.LocalTime
 
 data class LocationsUiState(
@@ -67,8 +70,10 @@ class WeatherViewModel(application: Application) : ViewModel() {
     private var weatherRepository: WeatherRepository = fakeWeatherRepository
     private val applicationContext = application.applicationContext
     private var weatherDetailJob: Job? = null
+    private var weatherFreshnessJob: Job? = null
     private var locationsJob: Job? = null
     private var weatherDetailLocationId: String? = null
+    private var weatherDetailRefreshLocationId: String? = null
     private var currentLanguageTag: String? = null
     private var currentWeatherSource: WeatherDataSource = WeatherDataSource.FAKE
 
@@ -138,8 +143,28 @@ class WeatherViewModel(application: Application) : ViewModel() {
     }
 
     fun loadWeatherData(locationId: String) {
+        weatherDetailRefreshLocationId = locationId
+        loadWeatherData(locationId = locationId, forceRefresh = false)
+    }
+
+    fun stopWeatherDetailRefresh(locationId: String) {
+        if (weatherDetailRefreshLocationId == locationId) {
+            weatherDetailRefreshLocationId = null
+            weatherFreshnessJob?.cancel()
+            weatherFreshnessJob = null
+        }
+    }
+
+    private fun loadWeatherData(locationId: String, forceRefresh: Boolean) {
+        val languageTag = currentLanguageTag
         val currentState = _weatherDetailState.value
-        if (currentState is WeatherDetailUiState.Success && currentState.weatherData.location.id == locationId) {
+        val isSameSuccessfulLocation = currentState is WeatherDetailUiState.Success &&
+            currentState.weatherData.location.id == locationId
+        if (!forceRefresh &&
+            isSameSuccessfulLocation &&
+            weatherRepository.isWeatherDataFresh(locationId, languageTag)
+        ) {
+            scheduleWeatherFreshnessRefresh(locationId, languageTag)
             return
         }
 
@@ -151,20 +176,25 @@ class WeatherViewModel(application: Application) : ViewModel() {
         weatherDetailLocationId = locationId
 
         weatherDetailJob = viewModelScope.launch {
-            val languageTag = resolveCurrentLanguageTag()
-            _weatherDetailState.value = WeatherDetailUiState.Loading
-            weatherRepository.getWeatherData(locationId, languageTag)
+            val resolvedLanguageTag = resolveCurrentLanguageTag()
+            if (!isSameSuccessfulLocation) {
+                _weatherDetailState.value = WeatherDetailUiState.Loading
+            }
+            weatherRepository.getWeatherData(locationId, resolvedLanguageTag)
                 .catch { e ->
-                    val localizedContext = applicationContext.localized(languageTag)
-                    _weatherDetailState.value = WeatherDetailUiState.Error(
-                        localizedContext.getString(
-                            R.string.weather_detail_load_error_format,
-                            e.message ?: localizedContext.getString(R.string.weather_detail_error_unknown)
+                    val localizedContext = applicationContext.localized(resolvedLanguageTag)
+                    if (!isSameSuccessfulLocation) {
+                        _weatherDetailState.value = WeatherDetailUiState.Error(
+                            localizedContext.getString(
+                                R.string.weather_detail_load_error_format,
+                                e.message ?: localizedContext.getString(R.string.weather_detail_error_unknown)
+                            )
                         )
-                    )
+                    }
                 }
                 .collect { data ->
                     _weatherDetailState.value = WeatherDetailUiState.Success(data)
+                    scheduleWeatherFreshnessRefresh(locationId, resolvedLanguageTag)
                 }
         }
     }
@@ -256,8 +286,29 @@ class WeatherViewModel(application: Application) : ViewModel() {
         val locationId = weatherDetailLocationId ?: return
         weatherDetailJob?.cancel()
         weatherDetailJob = null
+        weatherFreshnessJob?.cancel()
+        weatherFreshnessJob = null
         _weatherDetailState.value = WeatherDetailUiState.Loading
         loadWeatherData(locationId)
+    }
+
+    private fun scheduleWeatherFreshnessRefresh(locationId: String, languageTag: String?) {
+        weatherFreshnessJob?.cancel()
+
+        val refreshAt = weatherRepository.nextWeatherRefreshInstant(locationId, languageTag) ?: return
+        val delayMillis = Duration.between(Instant.now(), refreshAt)
+            .toMillis()
+            .coerceAtLeast(0L) + 1_000L
+
+        weatherFreshnessJob = viewModelScope.launch {
+            delay(delayMillis)
+            if (weatherDetailRefreshLocationId != locationId ||
+                weatherRepository.isWeatherDataFresh(locationId, languageTag)
+            ) {
+                return@launch
+            }
+            loadWeatherData(locationId = locationId, forceRefresh = true)
+        }
     }
 
     private suspend fun resolveCurrentLanguageTag(): String? {

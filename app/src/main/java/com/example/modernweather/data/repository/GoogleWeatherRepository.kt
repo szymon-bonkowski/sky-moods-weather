@@ -19,6 +19,7 @@ import com.example.modernweather.data.models.WeatherDetails
 import com.example.modernweather.utils.WeatherTextFormatter
 import com.example.modernweather.utils.locationNameForId
 import com.example.modernweather.utils.localized
+import java.time.Clock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.CancellationException
@@ -47,22 +48,9 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 class GoogleWeatherRepository(
-    private val context: Context
+    private val context: Context,
+    private val clock: Clock = Clock.systemUTC()
 ) : WeatherRepository {
-
-    private data class CacheEntry<T>(
-        val value: T,
-        val fetchedAt: Instant
-    ) {
-        fun isFresh(now: Instant, ttl: Duration): Boolean {
-            return !fetchedAt.plus(ttl).isBefore(now)
-        }
-    }
-
-    private data class WeatherDataCacheKey(
-        val locationId: String,
-        val languageCode: String
-    )
 
     private data class EndpointCacheKey(
         val locationId: String,
@@ -112,6 +100,11 @@ class GoogleWeatherRepository(
         }
     }
 
+    private data class RequestTimeouts(
+        val connectMillis: Int,
+        val readMillis: Int
+    )
+
     private val locationSpecs = listOf(
         LocationSpec(
             id = "warszawa",
@@ -137,10 +130,9 @@ class GoogleWeatherRepository(
     )
 
     private val locationCache = ConcurrentHashMap<String, Location>()
-    private val weatherDataCache = ConcurrentHashMap<WeatherDataCacheKey, CacheEntry<WeatherData>>()
-    private val endpointJsonCache = ConcurrentHashMap<EndpointCacheKey, CacheEntry<JSONObject>>()
-    private val airQualityCache = ConcurrentHashMap<EndpointCacheKey, CacheEntry<AirQualityBundle>>()
-    private val pollenCache = ConcurrentHashMap<EndpointCacheKey, CacheEntry<PollenBundle>>()
+    private val endpointJsonCache = TimedCache<EndpointCacheKey, JSONObject>(clock)
+    private val airQualityCache = TimedCache<EndpointCacheKey, AirQualityBundle>(clock)
+    private val pollenCache = TimedCache<EndpointCacheKey, PollenBundle>(clock)
 
     @Volatile
     private var lastCurrentTime: LocalTime? = null
@@ -159,6 +151,11 @@ class GoogleWeatherRepository(
         val AIR_QUALITY_TTL: Duration = Duration.ofMinutes(15)
         val POLLEN_TTL: Duration = Duration.ofHours(1)
         const val SECONDARY_ENDPOINT_TIMEOUT_MILLIS = 2_500L
+        val CORE_REQUEST_TIMEOUTS = RequestTimeouts(connectMillis = 15_000, readMillis = 15_000)
+        val SECONDARY_REQUEST_TIMEOUTS = RequestTimeouts(
+            connectMillis = SECONDARY_ENDPOINT_TIMEOUT_MILLIS.toInt(),
+            readMillis = SECONDARY_ENDPOINT_TIMEOUT_MILLIS.toInt()
+        )
     }
 
     override fun getSavedLocations(languageTag: String?): Flow<List<Location>> = flow {
@@ -170,16 +167,29 @@ class GoogleWeatherRepository(
         emit(fetchWeatherData(locationId, languageTag))
     }
 
+    override fun isWeatherDataFresh(locationId: String, languageTag: String?): Boolean {
+        val spec = locationSpecs.firstOrNull { it.id == locationId } ?: return false
+        return coreWeatherCachePolicies().all { (endpoint, ttl) ->
+            val key = EndpointCacheKey(spec.id, languageCode(languageTag), endpoint)
+            endpointJsonCache.isFresh(key, ttl)
+        }
+    }
+
+    override fun nextWeatherRefreshInstant(locationId: String, languageTag: String?): Instant? {
+        val spec = locationSpecs.firstOrNull { it.id == locationId } ?: return null
+        return coreWeatherCachePolicies().mapNotNull { (endpoint, ttl) ->
+            val key = EndpointCacheKey(spec.id, languageCode(languageTag), endpoint)
+            endpointJsonCache.nextRefreshInstant(key, ttl)
+        }.minOrNull()
+    }
+
     override fun getCurrentTime(): LocalTime = lastCurrentTime ?: LocalTime.now()
 
     private suspend fun fetchWeatherData(locationId: String, languageTag: String?): WeatherData {
         val spec = locationSpecs.firstOrNull { it.id == locationId }
             ?: throw IllegalArgumentException("Unknown Google Weather location ID: $locationId")
-        val cacheKey = WeatherDataCacheKey(spec.id, languageCode(languageTag))
-        return cached(weatherDataCache, cacheKey, CURRENT_CONDITIONS_TTL) {
-            withContext(Dispatchers.Default) {
-                loadWeatherData(spec, languageTag)
-            }
+        return withContext(Dispatchers.Default) {
+            loadWeatherData(spec, languageTag)
         }
     }
 
@@ -243,12 +253,10 @@ class GoogleWeatherRepository(
             )
         }
         val airQualityDeferred = async {
-            runCatching { cachedAirQualityBundle(spec, languageTag) }
-                .getOrDefault(AirQualityBundle.Unavailable)
+            cachedAirQualityBundle(spec, languageTag)
         }
         val pollenDeferred = async {
-            runCatching { cachedPollenBundle(spec, languageTag) }
-                .getOrDefault(PollenBundle.Unavailable)
+            cachedPollenBundle(spec, languageTag)
         }
 
         val current = currentDeferred.await()
@@ -257,7 +265,7 @@ class GoogleWeatherRepository(
         val daily = dailyDeferred.await()
 
         val zoneId = resolveZoneId(current, hourly, history, daily)
-        val currentInstant = parseInstantOrNull(current.optStringOrNull("currentTime")) ?: Instant.now()
+        val currentInstant = parseInstantOrNull(current.optStringOrNull("currentTime")) ?: clock.instant()
         val currentLocalDateTime = currentInstant.atZone(zoneId).toLocalDateTime()
         val currentLocalDate = currentLocalDateTime.toLocalDate()
         lastCurrentTime = currentLocalDateTime.toLocalTime()
@@ -313,8 +321,12 @@ class GoogleWeatherRepository(
             )
         )
 
-        val airQuality = awaitSecondary(airQualityDeferred, AirQualityBundle.Unavailable)
-        val pollen = awaitSecondary(pollenDeferred, PollenBundle.Unavailable)
+        val airQuality = awaitSecondary(airQualityDeferred) {
+            staleAirQualityBundle(spec, languageTag) ?: AirQualityBundle.Unavailable
+        }
+        val pollen = awaitSecondary(pollenDeferred) {
+            stalePollenBundle(spec, languageTag) ?: PollenBundle.Unavailable
+        }
 
         val weatherDetails = WeatherDetails(
             windSpeed = currentWindSpeed,
@@ -379,8 +391,8 @@ class GoogleWeatherRepository(
         url: String
     ): JSONObject {
         val key = EndpointCacheKey(spec.id, languageCode(languageTag), endpoint)
-        return cached(endpointJsonCache, key, ttl) {
-            requestJson(url)
+        return endpointJsonCache.getOrLoad(key, ttl) {
+            requestJson(url, timeouts = CORE_REQUEST_TIMEOUTS)
         }
     }
 
@@ -389,7 +401,7 @@ class GoogleWeatherRepository(
         languageTag: String?
     ): AirQualityBundle {
         val key = EndpointCacheKey(spec.id, languageCode(languageTag), "airQuality")
-        return cached(airQualityCache, key, AIR_QUALITY_TTL) {
+        return airQualityCache.getOrLoad(key, AIR_QUALITY_TTL) {
             fetchAirQualityBundle(spec, languageTag)
         }
     }
@@ -399,41 +411,44 @@ class GoogleWeatherRepository(
         languageTag: String?
     ): PollenBundle {
         val key = EndpointCacheKey(spec.id, languageCode(languageTag), "pollen")
-        return cached(pollenCache, key, POLLEN_TTL) {
+        return pollenCache.getOrLoad(key, POLLEN_TTL) {
             fetchPollenBundle(spec, languageTag)
         }
     }
 
-    private suspend fun <K, T> cached(
-        cache: ConcurrentHashMap<K, CacheEntry<T>>,
-        key: K,
-        ttl: Duration,
-        loader: suspend () -> T
-    ): T {
-        val now = Instant.now()
-        val cached = cache[key]
-        if (cached != null && cached.isFresh(now, ttl)) {
-            return cached.value
-        }
-
-        return runCatching { loader() }
-            .onSuccess { value -> cache[key] = CacheEntry(value, Instant.now()) }
-            .getOrElse { error ->
-                if (error is CancellationException) {
-                    throw error
-                }
-                cached?.value ?: throw error
-            }
+    private fun staleAirQualityBundle(spec: LocationSpec, languageTag: String?): AirQualityBundle? {
+        val key = EndpointCacheKey(spec.id, languageCode(languageTag), "airQuality")
+        return airQualityCache.getStale(key)
     }
 
-    private suspend fun <T> awaitSecondary(deferred: Deferred<T>, fallback: T): T {
-        val result = withTimeoutOrNull(SECONDARY_ENDPOINT_TIMEOUT_MILLIS) {
-            deferred.await()
+    private fun stalePollenBundle(spec: LocationSpec, languageTag: String?): PollenBundle? {
+        val key = EndpointCacheKey(spec.id, languageCode(languageTag), "pollen")
+        return pollenCache.getStale(key)
+    }
+
+    private suspend fun <T> awaitSecondary(deferred: Deferred<T>, fallback: () -> T): T {
+        return try {
+            val result = withTimeoutOrNull(SECONDARY_ENDPOINT_TIMEOUT_MILLIS) {
+                deferred.await()
+            }
+            if (result == null) {
+                deferred.cancel()
+            }
+            result ?: fallback()
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            fallback()
         }
-        if (result == null) {
-            deferred.cancel()
-        }
-        return result ?: fallback
+    }
+
+    private fun coreWeatherCachePolicies(): List<Pair<String, Duration>> {
+        return listOf(
+            "currentConditions" to CURRENT_CONDITIONS_TTL,
+            "hourlyForecast" to HOURLY_FORECAST_TTL,
+            "hourlyHistory" to HOURLY_HISTORY_TTL,
+            "dailyForecast" to DAILY_FORECAST_TTL
+        )
     }
 
     private fun resolveLocation(spec: LocationSpec, localizedContext: Context, languageTag: String?): Location {
@@ -594,7 +609,8 @@ class GoogleWeatherRepository(
         val json = requestJson(
             url = "https://airquality.googleapis.com/v1/currentConditions:lookup?key=${encodeQuery(apiKey())}",
             method = "POST",
-            requestBody = body.toString()
+            requestBody = body.toString(),
+            timeouts = SECONDARY_REQUEST_TIMEOUTS
         )
         val indexes = json.optJSONArray("indexes").toObjectList()
         val selectedIndex = indexes.firstOrNull { it.optString("code").equals("usa_epa", ignoreCase = true) }
@@ -622,7 +638,7 @@ class GoogleWeatherRepository(
             append("&plantsDescription=false")
             append("&languageCode=${encodeQuery(languageCode(languageTag))}")
         }
-        val json = requestJson(url)
+        val json = requestJson(url, timeouts = SECONDARY_REQUEST_TIMEOUTS)
         val day = json.optJSONArray("dailyInfo").toObjectList().firstOrNull()
             ?: return PollenBundle.Unavailable
         val pollenTypes = day.optJSONArray("pollenTypeInfo").toObjectList()
@@ -642,12 +658,13 @@ class GoogleWeatherRepository(
     private suspend fun requestJson(
         url: String,
         method: String = "GET",
-        requestBody: String? = null
+        requestBody: String? = null,
+        timeouts: RequestTimeouts
     ): JSONObject = withContext(Dispatchers.IO) {
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = method
-            connectTimeout = 15_000
-            readTimeout = 15_000
+            connectTimeout = timeouts.connectMillis
+            readTimeout = timeouts.readMillis
             setRequestProperty("Accept", "application/json")
             setRequestProperty("X-Android-Package", context.packageName)
             androidCertificateSha1()?.let { certificateSha1 ->
@@ -838,7 +855,7 @@ class GoogleWeatherRepository(
             if (parsed != null) return parsed
         }
 
-        return parseStartInstant(node)?.atZone(zoneId)?.toLocalDateTime() ?: LocalDateTime.now(zoneId)
+        return parseStartInstant(node)?.atZone(zoneId)?.toLocalDateTime() ?: LocalDateTime.now(clock.withZone(zoneId))
     }
 
     private fun parseDisplayDate(node: JSONObject): LocalDate? {

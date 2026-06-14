@@ -1,6 +1,7 @@
 package com.example.modernweather
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -23,9 +24,14 @@ import com.example.modernweather.ui.viewmodel.WeatherViewModel
 import com.example.modernweather.utils.localized
 
 class MainActivity : ComponentActivity() {
+    private var pendingNotificationPermissionResult: ((Boolean) -> Unit)? = null
+
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) {}
+    ) { granted ->
+        pendingNotificationPermissionResult?.invoke(granted)
+        pendingNotificationPermissionResult = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -74,11 +80,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestNowcastNotificationPermission() {
+    private fun requestNowcastNotificationPermission(onResult: (Boolean) -> Unit) {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
         ) {
+            pendingNotificationPermissionResult = onResult
             requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            onResult(true)
         }
     }
 }

@@ -33,7 +33,7 @@ object NowcastScheduler {
         val workManager = WorkManager.getInstance(context)
         workManager.enqueueUniquePeriodicWork(
             PERIODIC_WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             periodicRequest
         )
 

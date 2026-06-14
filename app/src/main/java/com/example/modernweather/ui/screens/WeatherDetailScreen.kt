@@ -66,6 +66,11 @@ fun WeatherDetailScreen(
     LaunchedEffect(locationId) {
         viewModel.loadWeatherData(locationId)
     }
+    DisposableEffect(locationId) {
+        onDispose {
+            viewModel.stopWeatherDetailRefresh(locationId)
+        }
+    }
 
     val uiState by viewModel.weatherDetailState.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
@@ -123,6 +128,11 @@ fun WeatherPage(
 
     val listState = rememberLazyListState()
     val isWeatherListScrolling = listState.isScrollInProgress
+    val isSunCycleVisible by remember {
+        derivedStateOf {
+            listState.layoutInfo.visibleItemsInfo.any { it.key == "sun_cycle" }
+        }
+    }
 
     val stableHourlyForecast = remember(data.hourlyForecast) { data.hourlyForecast }
     val stableDailyForecast = remember(data.dailyForecast) { data.dailyForecast }
@@ -188,7 +198,7 @@ fun WeatherPage(
             SunCycleSection(
                 sunInfo = data.sunInfo,
                 currentTime = currentTime,
-                isParentScrolling = isWeatherListScrolling
+                isAnimationEnabled = isSunCycleVisible && !isWeatherListScrolling
             )
         }
     }
@@ -582,12 +592,12 @@ fun RadarCard(onClick: () -> Unit) {
 fun SunCycleSection(
     sunInfo: SunInfo,
     currentTime: java.time.LocalTime,
-    isParentScrolling: Boolean
+    isAnimationEnabled: Boolean
 ) {
     SunCycle(
         sunInfo = sunInfo,
         currentTime = currentTime,
-        isAnimationEnabled = !isParentScrolling
+        isAnimationEnabled = isAnimationEnabled
     )
 }
 

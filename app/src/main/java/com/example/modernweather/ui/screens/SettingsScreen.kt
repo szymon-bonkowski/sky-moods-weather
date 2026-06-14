@@ -69,7 +69,7 @@ fun TitledCard(
 fun SettingsScreen(
     viewModel: WeatherViewModel,
     onNavigateBack: () -> Unit,
-    onRequestNotificationPermission: () -> Unit
+    onRequestNotificationPermission: ((Boolean) -> Unit) -> Unit
 ) {
     val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -259,7 +259,7 @@ private fun NowcastSettingsSection(
     onMonitoringChanged: (Boolean) -> Unit,
     onNotificationsChanged: (Boolean) -> Unit,
     onUseTfliteChanged: (Boolean) -> Unit,
-    onRequestNotificationPermission: () -> Unit
+    onRequestNotificationPermission: ((Boolean) -> Unit) -> Unit
 ) {
     Column {
         SettingItem(label = stringResource(R.string.settings_enable_local_nowcast)) {
@@ -286,9 +286,12 @@ private fun NowcastSettingsSection(
                         checked = notificationsEnabled,
                         onCheckedChange = { enabled ->
                             if (enabled) {
-                                onRequestNotificationPermission()
+                                onRequestNotificationPermission { granted ->
+                                    onNotificationsChanged(granted)
+                                }
+                            } else {
+                                onNotificationsChanged(false)
                             }
-                            onNotificationsChanged(enabled)
                         }
                     )
                 }

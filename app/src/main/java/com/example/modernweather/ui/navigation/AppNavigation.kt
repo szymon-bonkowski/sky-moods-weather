@@ -24,7 +24,7 @@ sealed class Screen(val route: String) {
 @Composable
 fun AppNavigation(
     weatherViewModel: WeatherViewModel,
-    onRequestNotificationPermission: () -> Unit
+    onRequestNotificationPermission: ((Boolean) -> Unit) -> Unit
 ) {
     val navController = rememberNavController()
 
