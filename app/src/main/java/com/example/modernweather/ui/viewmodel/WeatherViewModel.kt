@@ -2,7 +2,6 @@ package com.example.modernweather.ui.viewmodel
 
 import android.app.Application
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.modernweather.R
 import com.example.modernweather.data.models.Location
@@ -59,10 +58,6 @@ data class SettingsUiState(
 )
 
 class WeatherViewModel(application: Application) : ViewModel() {
-
-    companion object {
-        lateinit var Factory: ViewModelProvider.Factory
-    }
 
     private val settingsRepository = SettingsRepository(application)
     private val nowcastRepository = NowcastRepository(application)

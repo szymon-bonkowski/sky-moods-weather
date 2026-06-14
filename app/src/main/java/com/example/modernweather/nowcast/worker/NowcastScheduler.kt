@@ -2,41 +2,59 @@ package com.example.modernweather.nowcast.worker
 
 import android.content.Context
 import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.concurrent.TimeUnit
 
 object NowcastScheduler {
-    private const val UNIQUE_WORK_NAME = "local-pressure-nowcast"
+    private const val PERIODIC_WORK_NAME = "local-pressure-nowcast-periodic"
+    private const val IMMEDIATE_WORK_NAME = "local-pressure-nowcast-immediate"
+    private const val WORK_TAG = "local-pressure-nowcast"
 
     fun schedule(context: Context, intervalMinutes: Int, immediate: Boolean = false) {
-        val clamped = intervalMinutes.coerceIn(5, 30)
-        val delayMinutes = if (immediate) 0 else clamped
-        val request = OneTimeWorkRequestBuilder<PressureNowcastWorker>()
-            .setInitialDelay(delayMinutes.toLong(), TimeUnit.MINUTES)
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiresBatteryNotLow(true)
-                    .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
-                    .build()
-            )
-            .addTag(UNIQUE_WORK_NAME)
+        val clamped = intervalMinutes.coerceIn(15, 30)
+        val constraints = Constraints.Builder()
+            .setRequiresBatteryNotLow(true)
+            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
             .build()
 
-        // Use KEEP instead of REPLACE to prevent WorkManager from canceling and recreating workers
-        // This eliminates the ForceStopRunnable and IdGenerator memory leak issues
-        WorkManager.getInstance(context).enqueueUniqueWork(
-            UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.KEEP,
-            request
+        val periodicRequest = PeriodicWorkRequestBuilder<PressureNowcastWorker>(
+            clamped.toLong(),
+            TimeUnit.MINUTES
         )
+            .setConstraints(constraints)
+            .addTag(WORK_TAG)
+            .build()
+
+        val workManager = WorkManager.getInstance(context)
+        workManager.enqueueUniquePeriodicWork(
+            PERIODIC_WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            periodicRequest
+        )
+
+        if (immediate) {
+            val immediateRequest = OneTimeWorkRequestBuilder<PressureNowcastWorker>()
+                .setConstraints(constraints)
+                .addTag(WORK_TAG)
+                .build()
+
+            workManager.enqueueUniqueWork(
+                IMMEDIATE_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                immediateRequest
+            )
+        }
     }
 
     fun cancel(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_WORK_NAME)
-        // Also cancel by tag to ensure complete cleanup
-        WorkManager.getInstance(context).cancelAllWorkByTag(UNIQUE_WORK_NAME)
+        val workManager = WorkManager.getInstance(context)
+        workManager.cancelUniqueWork(PERIODIC_WORK_NAME)
+        workManager.cancelUniqueWork(IMMEDIATE_WORK_NAME)
+        workManager.cancelAllWorkByTag(WORK_TAG)
     }
 }

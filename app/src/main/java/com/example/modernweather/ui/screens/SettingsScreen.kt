@@ -33,6 +33,7 @@ import android.hardware.Sensor
 import android.hardware.SensorManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.modernweather.R
 import com.example.modernweather.data.models.AppLanguage
 import com.example.modernweather.data.models.TemperatureUnit
@@ -67,9 +68,10 @@ fun TitledCard(
 @Composable
 fun SettingsScreen(
     viewModel: WeatherViewModel,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onRequestNotificationPermission: () -> Unit
 ) {
-    val settingsState by viewModel.settingsState.collectAsState()
+    val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val hasBarometer = remember {
         val sensorManager = context.getSystemService(android.content.Context.SENSOR_SERVICE) as SensorManager
@@ -130,7 +132,8 @@ fun SettingsScreen(
                     hasBarometer = hasBarometer,
                     onMonitoringChanged = viewModel::updateNowcastMonitoring,
                     onNotificationsChanged = viewModel::updateNowcastNotifications,
-                    onUseTfliteChanged = viewModel::updateNowcastUseTflite
+                    onUseTfliteChanged = viewModel::updateNowcastUseTflite,
+                    onRequestNotificationPermission = onRequestNotificationPermission
                 )
             }
 
@@ -255,7 +258,8 @@ private fun NowcastSettingsSection(
     hasBarometer: Boolean,
     onMonitoringChanged: (Boolean) -> Unit,
     onNotificationsChanged: (Boolean) -> Unit,
-    onUseTfliteChanged: (Boolean) -> Unit
+    onUseTfliteChanged: (Boolean) -> Unit,
+    onRequestNotificationPermission: () -> Unit
 ) {
     Column {
         SettingItem(label = stringResource(R.string.settings_enable_local_nowcast)) {
@@ -278,7 +282,15 @@ private fun NowcastSettingsSection(
         AnimatedVisibility(visible = monitoringEnabled && hasBarometer) {
             Column {
                 SettingItem(label = stringResource(R.string.settings_nowcast_notifications_label)) {
-                    Switch(checked = notificationsEnabled, onCheckedChange = onNotificationsChanged)
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                onRequestNotificationPermission()
+                            }
+                            onNotificationsChanged(enabled)
+                        }
+                    )
                 }
                 SettingItem(label = stringResource(R.string.settings_nowcast_ml_model_label)) {
                     Switch(checked = useTflite, onCheckedChange = onUseTfliteChanged)

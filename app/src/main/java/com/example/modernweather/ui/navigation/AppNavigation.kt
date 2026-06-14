@@ -1,7 +1,6 @@
 package com.example.modernweather.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -23,9 +22,11 @@ sealed class Screen(val route: String) {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    weatherViewModel: WeatherViewModel,
+    onRequestNotificationPermission: () -> Unit
+) {
     val navController = rememberNavController()
-    val weatherViewModel: WeatherViewModel = viewModel(factory = WeatherViewModel.Factory)
 
     NavHost(navController = navController, startDestination = Screen.Locations.route) {
         composable(Screen.Locations.route) {
@@ -56,7 +57,8 @@ fun AppNavigation() {
         composable(Screen.Settings.route) {
             SettingsScreen(
                 viewModel = weatherViewModel,
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onRequestNotificationPermission = onRequestNotificationPermission
             )
         }
         composable(Screen.Radar.route) {

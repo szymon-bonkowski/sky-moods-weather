@@ -3,7 +3,6 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    kotlin("kapt")
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -50,7 +49,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
@@ -74,11 +74,11 @@ android {
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
-    implementation("androidx.compose.foundation:foundation:1.7.0")
+    implementation("androidx.compose.foundation:foundation")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
-    implementation("androidx.appcompat:appcompat:1.7.0")
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)

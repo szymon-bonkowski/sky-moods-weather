@@ -313,12 +313,6 @@ fun WeeklyForecastChart(
             }
         }
 
-        LaunchedEffect(scrollState.isScrollInProgress, initialScrollPx) {
-            if (!scrollState.isScrollInProgress && scrollState.value < initialScrollPx) {
-                scrollState.animateScrollTo(initialScrollPx.coerceAtMost(scrollState.maxValue))
-            }
-        }
-
         Box(
             modifier = Modifier
                 .fillMaxSize()

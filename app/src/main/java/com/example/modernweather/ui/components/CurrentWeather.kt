@@ -194,14 +194,6 @@ private fun HourlySimpleList(
 
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = currentHourIndex)
 
-    LaunchedEffect(currentHourIndex, listState.isScrollInProgress) {
-        if (!listState.isScrollInProgress) {
-            if (listState.firstVisibleItemIndex != currentHourIndex) {
-                listState.animateScrollToItem(currentHourIndex)
-            }
-        }
-    }
-
     val chartShape = RoundedCornerShape(24.dp)
     val density = LocalDensity.current
 

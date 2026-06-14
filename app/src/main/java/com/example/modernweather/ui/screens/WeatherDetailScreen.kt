@@ -42,6 +42,7 @@ import android.hardware.Sensor
 import android.hardware.SensorManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.modernweather.R
 import com.example.modernweather.data.models.*
 import com.example.modernweather.nowcast.model.LocalRiskLevel
@@ -66,8 +67,8 @@ fun WeatherDetailScreen(
         viewModel.loadWeatherData(locationId)
     }
 
-    val uiState by viewModel.weatherDetailState.collectAsState()
-    val settingsState by viewModel.settingsState.collectAsState()
+    val uiState by viewModel.weatherDetailState.collectAsStateWithLifecycle()
+    val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -120,8 +121,8 @@ fun WeatherPage(
         sensorManager.getDefaultSensor(Sensor.TYPE_PRESSURE) != null
     }
 
-    val stableSunInfo = remember(data.location.id) { data.sunInfo }
     val listState = rememberLazyListState()
+    val isWeatherListScrolling = listState.isScrollInProgress
 
     val stableHourlyForecast = remember(data.hourlyForecast) { data.hourlyForecast }
     val stableDailyForecast = remember(data.dailyForecast) { data.dailyForecast }
@@ -184,14 +185,18 @@ fun WeatherPage(
         }
 
         item(key = "sun_cycle", contentType = "sun_cycle") {
-            SunCycleSection(sunInfo = stableSunInfo, viewModel = viewModel)
+            SunCycleSection(
+                sunInfo = data.sunInfo,
+                currentTime = currentTime,
+                isParentScrolling = isWeatherListScrolling
+            )
         }
     }
 }
 
 @Composable
 private fun LocalNowcastCardItem(viewModel: WeatherViewModel) {
-    val nowcastAssessment by viewModel.nowcastAssessmentState.collectAsState()
+    val nowcastAssessment by viewModel.nowcastAssessmentState.collectAsStateWithLifecycle()
     LocalNowcastCard(assessment = nowcastAssessment)
 }
 
@@ -574,8 +579,16 @@ fun RadarCard(onClick: () -> Unit) {
 }
 
 @Composable
-fun SunCycleSection(sunInfo: SunInfo, viewModel: WeatherViewModel) {
-    SunCycle(sunInfo = sunInfo, viewModel = viewModel)
+fun SunCycleSection(
+    sunInfo: SunInfo,
+    currentTime: java.time.LocalTime,
+    isParentScrolling: Boolean
+) {
+    SunCycle(
+        sunInfo = sunInfo,
+        currentTime = currentTime,
+        isAnimationEnabled = !isParentScrolling
+    )
 }
 
 @Composable
