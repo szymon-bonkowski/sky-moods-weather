@@ -24,3 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Sky Moods - Weather"
 include(":app")
+include(":baseline-profile")

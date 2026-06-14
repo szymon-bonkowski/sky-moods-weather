@@ -70,30 +70,21 @@ class PressureNowcastWorker(
                 null
             }
             val engine = NowcastEngine()
-            val assessment = engine.evaluate(
-                history = filtered,
-                settings = settings,
-                predictor = predictor
-            )
-            predictor?.close()
+            val assessment = try {
+                engine.evaluate(
+                    history = filtered,
+                    settings = settings,
+                    predictor = predictor
+                )
+            } finally {
+                predictor?.close()
+            }
 
             repository.saveAssessment(assessment)
             maybeNotify(assessment, settings.notificationCooldownMinutes, repository)
 
-            // Only reschedule if monitoring is still enabled AFTER all work is done
-            // This prevents infinite reschedule loops
-            val currentSettings = repository.getSettings()
-            if (currentSettings.monitoringEnabled && !isStopped) {
-                NowcastScheduler.schedule(
-                    context = applicationContext,
-                    intervalMinutes = currentSettings.sampleIntervalMinutes,
-                    immediate = false
-                )
-            }
-
             Result.success()
         } catch (e: Exception) {
-            // Log error but don't reschedule on failure to prevent infinite retry loops
             Result.failure()
         }
     }

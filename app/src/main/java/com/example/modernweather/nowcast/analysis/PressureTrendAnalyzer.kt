@@ -37,9 +37,43 @@ class PressureTrendAnalyzer {
         val first = inWindow.first()
         val latest = inWindow.last()
         val pressureDrop3h = first.pressureHpa - latest.pressureHpa
-        val pressureDrop1h = computeDropInWindow(inWindow, nowEpochMillis - oneHourMillis, nowEpochMillis)
+        var oneHourFirst: RawPressureSample? = null
+        var oneHourLatest: RawPressureSample? = null
+        var sumX = 0f
+        var sumY = 0f
+        var sumXY = 0f
+        var sumXX = 0f
+        val firstTs = first.timestampEpochMillis
 
-        val slopePerHour = linearRegressionSlopePerHour(inWindow)
+        inWindow.forEach { sample ->
+            if (sample.timestampEpochMillis in (nowEpochMillis - oneHourMillis)..nowEpochMillis) {
+                if (oneHourFirst == null) {
+                    oneHourFirst = sample
+                }
+                oneHourLatest = sample
+            }
+
+            val x = (sample.timestampEpochMillis - firstTs).toFloat() / 3_600_000f
+            val y = sample.pressureHpa
+            sumX += x
+            sumY += y
+            sumXY += x * y
+            sumXX += x * x
+        }
+
+        val pressureDrop1h = if (oneHourFirst != null && oneHourFirst != oneHourLatest) {
+            oneHourFirst!!.pressureHpa - oneHourLatest!!.pressureHpa
+        } else {
+            0f
+        }
+
+        val n = inWindow.size.toFloat()
+        val denominator = n * sumXX - sumX * sumX
+        val slopePerHour = if (abs(denominator) < 1e-6f) {
+            0f
+        } else {
+            (n * sumXY - sumX * sumY) / denominator
+        }
 
         return PressureTrendResult(
             slopeHpaPerHour = slopePerHour,
@@ -47,33 +81,5 @@ class PressureTrendAnalyzer {
             pressureDrop1h = pressureDrop1h,
             sampleCountInWindow = inWindow.size
         )
-    }
-
-    private fun computeDropInWindow(
-        samples: List<RawPressureSample>,
-        startEpochMillis: Long,
-        endEpochMillis: Long
-    ): Float {
-        val within = samples.filter { it.timestampEpochMillis in startEpochMillis..endEpochMillis }
-        if (within.size < 2) return 0f
-        return within.first().pressureHpa - within.last().pressureHpa
-    }
-
-    private fun linearRegressionSlopePerHour(samples: List<RawPressureSample>): Float {
-        val n = samples.size.toFloat()
-        val firstTs = samples.first().timestampEpochMillis
-
-        val x = samples.map { ((it.timestampEpochMillis - firstTs).toFloat() / 3_600_000f) }
-        val y = samples.map { it.pressureHpa }
-
-        val sumX = x.sum()
-        val sumY = y.sum()
-        val sumXY = x.zip(y).sumOf { (xi, yi) -> (xi * yi).toDouble() }.toFloat()
-        val sumXX = x.sumOf { (it * it).toDouble() }.toFloat()
-
-        val denominator = n * sumXX - sumX * sumX
-        if (abs(denominator) < 1e-6f) return 0f
-
-        return (n * sumXY - sumX * sumY) / denominator
     }
 }

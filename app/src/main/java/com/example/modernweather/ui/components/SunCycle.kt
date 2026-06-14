@@ -1,11 +1,8 @@
 package com.example.modernweather.ui.components
 
-import androidx.compose.animation.core.EaseInOutSine
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
+import android.animation.ValueAnimator
+import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Column
@@ -17,8 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,22 +38,26 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.modernweather.data.models.SunInfo
 import com.example.modernweather.R
 import com.example.modernweather.ui.screens.TitledCard
-import com.example.modernweather.ui.viewmodel.WeatherViewModel
-import androidx.compose.animation.core.LinearEasing
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.random.Random
 
 @Composable
-fun SunCycle(sunInfo: SunInfo, viewModel: WeatherViewModel) {
-    val now = viewModel.getCurrentTime()
+fun SunCycle(
+    sunInfo: SunInfo,
+    currentTime: LocalTime,
+    isAnimationEnabled: Boolean = true
+) {
+    val now = currentTime
     val sunrise = sunInfo.sunrise
     val sunset = sunInfo.sunset
 
@@ -87,7 +90,11 @@ fun SunCycle(sunInfo: SunInfo, viewModel: WeatherViewModel) {
                 .fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            SunArc(progress = progress, isDay = isDay)
+            SunArc(
+                progress = progress,
+                isDay = isDay,
+                isAnimationEnabled = isAnimationEnabled
+            )
             Spacer(Modifier.height(8.dp))
             Row(
                 Modifier.fillMaxWidth(),
@@ -164,7 +171,11 @@ private fun DrawScope.drawStyledCloud(cloud: StyledCloud, globalAlpha: Float) {
 }
 
 @Composable
-fun SunArc(progress: Float, isDay: Boolean) {
+fun SunArc(
+    progress: Float,
+    isDay: Boolean,
+    isAnimationEnabled: Boolean
+) {
     val horizonColor = Color(0xFFFFD700)
     val middayColor = Color(0xFFFF6F00)
     val arcTrackColor = MaterialTheme.colorScheme.surfaceVariant
@@ -215,13 +226,19 @@ fun SunArc(progress: Float, isDay: Boolean) {
     )
 
     val starData = remember {
-        List(60) {
+        List(60) { index ->
+            val x = (((index * 37) + 17) % 100) / 100f
+            val y = (((index * 53) + 29) % 100) / 100f
+            val alphaSeed = (((index * 29) + 11) % 100) / 100f
+            val radiusSeed = (((index * 19) + 7) % 100) / 100f
+            val speedSeed = (((index * 23) + 13) % 100) / 100f
+            val phaseSeed = (((index * 31) + 5) % 100) / 100f
             StarData(
-                position = Offset(Random.nextFloat(), Random.nextFloat()),
-                baseAlpha = Random.nextFloat() * 0.8f + 0.2f,
-                baseRadius = Random.nextFloat() * 1.5f + 0.5f,
-                twinkleSpeed = Random.nextFloat() * 2f + 1f,
-                phaseOffset = Random.nextFloat() * 2f * Math.PI.toFloat()
+                position = Offset(x, y),
+                baseAlpha = alphaSeed * 0.8f + 0.2f,
+                baseRadius = radiusSeed * 1.5f + 0.5f,
+                twinkleSpeed = speedSeed * 2f + 1f,
+                phaseOffset = phaseSeed * 2f * Math.PI.toFloat()
             )
         }
     }
@@ -239,37 +256,23 @@ fun SunArc(progress: Float, isDay: Boolean) {
     val backgroundClouds = remember(clouds) { clouds.filter { !it.isForeground } }
     val foregroundClouds = remember(clouds) { clouds.filter { it.isForeground } }
 
-    val infiniteTransition = rememberInfiniteTransition(label = "animations")
-
-    val continuousTime by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 1000_000, easing = androidx.compose.animation.core.LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "continuous_time"
-    )
-
-    val sunGlowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 5000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "sun_glow_pulse"
-    )
-
-    val moonGlowPulse by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(durationMillis = 6000, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "moon_glow_pulse"
-    )
+    val isLifecycleStarted = rememberLifecycleStarted()
+    val areSystemAnimationsEnabled = remember { ValueAnimator.areAnimatorsEnabled() }
+    val isDecorativeAnimationRunning = isAnimationEnabled &&
+        isLifecycleStarted &&
+        areSystemAnimationsEnabled
+    val continuousTime = rememberDecorativeAnimationTime(isDecorativeAnimationRunning)
+    val hasAnimationFrame = continuousTime > 0f
+    val sunGlowPulse = if (hasAnimationFrame || isDecorativeAnimationRunning) {
+        glowPulse(elapsedSeconds = continuousTime, periodSeconds = 5f)
+    } else {
+        0.55f
+    }
+    val moonGlowPulse = if (hasAnimationFrame || isDecorativeAnimationRunning) {
+        glowPulse(elapsedSeconds = continuousTime, periodSeconds = 6f)
+    } else {
+        0.55f
+    }
 
     Canvas(
         modifier = Modifier
@@ -390,6 +393,51 @@ fun SunArc(progress: Float, isDay: Boolean) {
     }
 }
 
+@Composable
+private fun rememberLifecycleStarted(): Boolean {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isStarted by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, _ ->
+            isStarted = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    return isStarted
+}
+
+@Composable
+private fun rememberDecorativeAnimationTime(isRunning: Boolean): Float {
+    var elapsedSeconds by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(isRunning) {
+        var lastFrameMillis = SystemClock.elapsedRealtime()
+        while (isRunning) {
+            delay(DECORATIVE_FRAME_INTERVAL_MILLIS)
+            val nowMillis = SystemClock.elapsedRealtime()
+            elapsedSeconds += (nowMillis - lastFrameMillis) / 1_000f
+            lastFrameMillis = nowMillis
+        }
+    }
+
+    return elapsedSeconds
+}
+
+private fun glowPulse(elapsedSeconds: Float, periodSeconds: Float): Float {
+    val phase = elapsedSeconds / periodSeconds * TWO_PI - HALF_PI
+    return 0.6f + 0.2f * sin(phase)
+}
+
+private const val DECORATIVE_FRAME_INTERVAL_MILLIS = 250L
+private const val TWO_PI = (Math.PI * 2.0).toFloat()
+private const val HALF_PI = (Math.PI / 2.0).toFloat()
 
 data class StarData(
     val position: Offset,

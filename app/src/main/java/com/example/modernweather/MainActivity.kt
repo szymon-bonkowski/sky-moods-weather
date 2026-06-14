@@ -1,19 +1,20 @@
 package com.example.modernweather
 
 import android.Manifest
+import android.content.pm.PackageManager
 import android.os.Bundle
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -22,10 +23,15 @@ import com.example.modernweather.ui.theme.ModernWeatherTheme
 import com.example.modernweather.ui.viewmodel.WeatherViewModel
 import com.example.modernweather.utils.localized
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
+    private var pendingNotificationPermissionResult: ((Boolean) -> Unit)? = null
+
     private val requestNotificationPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) {}
+    ) { granted ->
+        pendingNotificationPermissionResult?.invoke(granted)
+        pendingNotificationPermissionResult = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,17 +48,9 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        WeatherViewModel.Factory = viewModelFactory
-
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
-        ) {
-            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-        }
-
         setContent {
-            val viewModel: WeatherViewModel = viewModel(factory = WeatherViewModel.Factory)
-            val settingsState by viewModel.settingsState.collectAsState()
+            val viewModel: WeatherViewModel = viewModel(factory = viewModelFactory)
+            val settingsState by viewModel.settingsState.collectAsStateWithLifecycle()
             val appLanguage = settingsState.appLanguage
 
             val baseContext = LocalContext.current
@@ -72,10 +70,24 @@ class MainActivity : AppCompatActivity() {
                         color = androidx.compose.material3.MaterialTheme.colorScheme.background,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        AppNavigation()
+                        AppNavigation(
+                            weatherViewModel = viewModel,
+                            onRequestNotificationPermission = ::requestNowcastNotificationPermission
+                        )
                     }
                 }
             }
+        }
+    }
+
+    private fun requestNowcastNotificationPermission(onResult: (Boolean) -> Unit) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingNotificationPermissionResult = onResult
+            requestNotificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            onResult(true)
         }
     }
 }

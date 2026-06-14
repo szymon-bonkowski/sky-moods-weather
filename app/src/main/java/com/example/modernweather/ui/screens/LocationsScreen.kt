@@ -10,12 +10,12 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.modernweather.R
 import com.example.modernweather.data.models.Location
 import com.example.modernweather.ui.viewmodel.LocationsUiState
@@ -28,7 +28,7 @@ fun LocationsScreen(
     onLocationClick: (String) -> Unit,
     onSettingsClick: () -> Unit
 ) {
-    val uiState by viewModel.locationsState.collectAsState()
+    val uiState by viewModel.locationsState.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
